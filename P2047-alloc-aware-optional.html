@@ -39,70 +39,107 @@ Audience: LEWG
 
 <h2>Abstract</h2>
  
+<p>
+  Library types that can potentially hold <em>allocator-aware (AA)</em>
+  objects should, themselves, be allocator-aware. A PMR container, for example,
+  depends on AA types following a known AA protocol so that it (the container)
+  can uniformly manage its memory. Even types that don't manage their own
+  memory, such as <tt>tuple</tt>, follow the AA rules when they hold one more
+  more AA elements. (A special case is <tt>pair</tt>, which is not actually AA
+  but effectively follows the rules through special handling
+  in <em>uses-allocator construction</em>.)
+</p>
+<p>
+  The current definition of <tt>std::optional</tt> does not follow the rules
+  for an AA type, even when holding an AA value. This limitation
+  makes <tt>optional</tt> unsuitable for storage in an AA container when
+  memory allocation customization is needed.
+</p>
+<p>
+  In this paper, we propose a new, allocator-aware
+  <tt>std::pmr::optional</tt> usable as a container element type and in any
+  other context where allocator propagation is expected. This new type would
+  not replace the current <tt>std::optional</tt>, but would resolve to
+  <tt>std::optional</tt> when the value type is not AA. By automatically
+  handling the distinction between AA and non-AA value types,
+  <tt>pmr::optional</tt> can easily be used in generic code where it is not
+  known in advance if it would be storing an AA type or not.
+</p>
+<p>  
+  This is a complete proposal with formal wording.
+  It has not yet been discussed in LEWGI or LEWG.
+</p>
 
-<h2>change history :</h2>
-- replaced <tt>alloc_optional</tt> with additional overloads of <tt>make_optional</tt> that 
-take an <tt>allocator_arg_t</tt> : it was observed that <tt>alloc_optional</tt> doesn't actually 
+<p>
+<br/>change history :
+<br/>- replaced <tt>alloc_optional</tt> with additional overloads of <tt>make_optional</tt> that
+take an <tt>allocator_arg_t</tt> : it was observed that <tt>alloc_optional</tt> doesn't actually
 do any allocation, and that the name is not appropriate
-- fixed the order of arguments in the <i>Returns</i> clause of what used to be <tt>alloc_optional</tt>
-- adjusted for LWG 2833
-- added discussion on deduction guides
-- removed mentions of using a type alias since the type alias approach has proven to be problematic
-- modified the specification of pmr::optional to cover both AA and non AA types
-- added CTAD specification
-
-
-<p>
-  This is a proposal for an allocator-aware optional type. For users
-  that use custom allocators, such a type is currently missing;
-  pair and tuple support allocators, but an optional type is also
-  deemed necessary, because some such users use optional types
-  as container elements. Therefore, an allocator-aware optional
-  type is necessary for the usual scoped-allocator use cases to work.
-<br/>  
-  This is a complete proposal. It has not been seen by LEWGI or LEWG yet.
+<br/>- fixed the order of arguments in the <i>Returns</i> clause of what used to be <tt>alloc_optional</tt>
+<br/>- adjusted for LWG 2833
+<br/>- added discussion on deduction guides
+<br/>- removed mentions of using a type alias since the type alias approach has proven to be problematic
+<br/>- modified the specification of pmr::optional to cover both AA and non AA types
+<br/>- added CTAD specification
 </p>
 
-<h2> Motivation</h2>
+
+<h2>Motivation and Proposal Summary</h2>
 <p>
-  Current optional type does not retain the element's allocator when it is
-  disengaged. This is a problem when using pmr containers because there is
-  no way of ensuring that a pmr::vector&lt;optional&gt; has all of its
-  elements using the same allocator - if an optional object gets disengaged, 
-  the pmr container it belongs to can not ensure the same allocator will 
-  be used if the optional object is re-engaged.
-  We propose an optional type which ensures that all of its elements use the same allocator.  
-  The allocator is not part of the type in the sense that it's 
-  not a template parameter.
+  C++ has been moving towards a consistent PMR allocator model whereby
+  <em>allocator-aware (AA)</em> types adhere to a few rules:
+</p>
+<ol>
+  <li>Once constructed, an object's allocator never changes.</li>
+  <li>The object's constructors all follow one of two argument protocols so
+    that they work with <em>uses-allocator construction</em> and thus can be
+    inserted as container elements using the container's allocator.</li>
+  <li>An object that can contain an AA element of user-specified type should
+    itself be AA and use its allocator to initialize its AA subobjects.</li>
+</ol>
+
+<p>
+  The current <tt>std::optional</tt> does not follow the above rules. When
+  disengaged, it forgets its allocator, violating the first rule; its
+  constructors don't follow the AA protocols, so containers cannot pass their
+  allocators to <tt>optional</tt> elements; and it does not hold on an
+  allocator by which it can initialize it's contained object. As a
+  result, <tt>std::optional</tt> is not a good fit for situations where
+  allocators are used.
+  A <tt>pmr::vector&lt;optional&lt;pmr::string&gt;&gt;</tt>, for example,
+  cannot ensure that all of strings within it use the same allocator,
+  violating a key invariant of PMR containers. If one of the elements of the
+  vector became disengaged and re-engaged, for example, the allocator for that
+  one element could change.
+/p>
+<p>
+  The <tt>pmr::optional</tt> class template proposed here properly adheres to
+  the rules of an AA type when instantiated with an AA value type. It holds a
+  copy of the allocator used to construct it, even when disengaged, and uses
+  that allocator to construct its element when re-engaged. Containers
+  of <tt>pmr::optional</tt> objects can correctly manage their memory.
 </p>
 
 <p>
-  In order to ensure its value object is always constructed with the same allocator, 
-  an allocator-aware optional needs to store the allocator used
-  for object creation. Storing an allocator incurs space overhead,
-  so we wish to avoid that overhead for types that are not allocator-aware.
-  Therefore, we are not proposing changing std::optional, but instead
-  adding a new std::pmr::optional that can handle allocator-aware
-  types.
-</p>
+  The basic design of an AA optional is straight-forward: Add an allocator to
+  all of its constructors and use that allocator to construct the value object
+  each type the optional is engaged.  However, when holding a non-AA type,
+  there is no reason to pay the overhead of storing an allocator, nor to
+  support the AA constructor interface. For this
+  reason, <tt>pmr::optional</tt></p> has a different specialisation for AA and
+  non-AAtype. 
+
+<h2>Design decisions:</h2>
 <p>
-  The rationale for polymorphic allocators applies here in general.
-  Allocator-aware optionals are interoperable even if they use
-  different concrete allocators, because the concrete allocator
-  doesn't change the type, nor does it change the size of the type.
-</p>
-<h2> Design decision</h2>
-<p>
-  We want std::pmr::optional to work for both allocator aware and non allocator aware type. 
-  However, such type
-  doesn't need the allocator extended interface for non allocator aware types. 
-  In fact, the interface and functionality of 
-  std::optional is sufficient for non allocator aware types.
-  We propose std::pmr::optional being an alias template; if the element
-  of the optional is not allocator-aware, the alias template aliases
-  std::optional. Otherwise, it aliases an unspecified type that
-  adds allocator parametercs to optional's constructor overload set and which remembers the
-  allocator when disengaged.
+  Rather than support the entire C++11-style set
+  allocators, <tt>pmr::optional</tt> works only
+  with <tt>pmr::polymorphic_allocator</tt>. The design keeps the allocator
+  from infecting the optional's type, in the sense that it's not a template
+  parameter. The modern PMR-style allocator model simplifies specification,
+  implementation, and use of <tt>pmr::optional</tt>.  Allocator-aware
+  optionals are interoperable even if they use different concrete allocators,
+  because the concrete allocator doesn't change the type, nor does it change
+  the size of the type.
 </p>
 
 <p>
@@ -123,13 +160,20 @@ do any allocation, and that the name is not appropriate
   aliases std::optional, and AA pmr::optional aliases a new unnamed type. 
   However, this causes usability issues. Type deduction in cases like :
 <br/><tt>
-<br/>template &lttypename T&gt
-<br/>void foo(pmr::optional&ltT&gt);
+<br/>template &lt;typename T&gt;
+<br/>void foo(pmr::optional&lt;T&gt;);
 <br/></tt>
 
-<br/>does not work because of the conditional part of the type alias - type 
-deduction needs to know if the type is AA aware before it can deduce what 
-type it needs. 
+<br/>did not work. The above was equivalent to 
+
+<br/><tt>
+<br/>template &lttypename T&gt
+<br/>void foo(conditional&lt;uses_allocator &lt;T, polymorphic_allocator&lt;&gt;&gt;::value ,
+<br/><tab2/><tab2/><tab2/><i>alloc_optional</i>&ltT&gt,
+<br/><tab2/><tab2/><tab2/>std::optional&lt;T&gt;&gt;:type);
+<br/></tt>
+<br/> 
+and using the nested <tt>type</tt> of the <tt>conditional</tt> as the function template parameter  made for an undeduced context.
 </p>
   
 
@@ -183,10 +227,14 @@ wouldn't be.
 
 <p><h3>Do we need an “allocator_aware” concept?</h3></p>
 <p>
-We might consider an “allocator aware” (AA) concept that requires a ‘get_allocator()’ 
-method that returns something convertible to ‘polymorphic_allocator&lt;&gt;’. 
-If we used this concept instead of the ‘less_allocator’ trait, the allocator would require 
-zero extra space in most (but not all) cases. (The exception would be a type that stores its allocator outside of its footprint and whose footprint is smaller than polymorphic_allocator<>.)</h3></hr></p>
+  We might consider an “allocator aware” (AA) concept that requires
+  a <tt>get_allocator()</tt>
+  method that returns something convertible to <tt>polymorphic_allocator&lt;&gt;</tt>.
+  If we used this concept instead of the <tt>uses_allocator</tt> trait, the allocator would require
+  zero extra space in most (but not all) cases. (The exception would be a type that stores 
+  its allocator outside of its footprint and whose footprint is smaller than 
+  polymorphic_allocator<>.)
+</p>
 <h2>Proposed wording</h2>
 <p>
 Add new paragraphs after 20.6.1/p1 [optional.general]
@@ -573,7 +621,7 @@ namespace pmr {
 <br/><tab/>   template&lt;class T&gt;
 <br/><tab2/>     class optional;
 <br/>		  
- <br/><tab/>  // [optional.relops], relational operators
+ <br/><tab/>  // [pmroptional.relops], relational operators
 <br/><tab/>   template&lt;class T, class U&gt;
 <br/><tab2/>	bool operator==(const optional&lt;T&gt;&amp;, const optional&lt;U&gt;&amp;);
 <br/><tab/>   template&lt;class T, class U&gt;
@@ -620,12 +668,12 @@ namespace pmr {
 <br/><tab2/>	compare_three_way_result_t&lt;T,U&gt;
 <br/><tab/><tab2/>      operator&lt;=&gt;(const std::optional&lt;T&gt;&amp;, const optional&lt;U&gt;&amp;);
 <br/>
-<br/><tab/>  // [optional.nullops], comparison with nullopt
+<br/><tab/>  // [pmroptional.nullops], comparison with nullopt
 <br/><tab/>   template&lt;class T&gt; bool operator==(const optional&lt;T&gt;&amp;, nullopt_t) noexcept;
 <br/><tab/>   template&lt;class T&gt;
 <br/><tab2/>	strong_ordering operator&lt;=&gt;(const optional&lt;T&gt;&amp;, nullopt_t) noexcept;
 <br/>
- <br/><tab/> // [optional.comp.with.t], comparison with T
+ <br/><tab/> // [pmroptional.comp.with.t], comparison with T
 <br/><tab/>   template&lt;class T, class U&gt; bool operator==(const optional&lt;T&gt;&amp;, const U&amp;);
 <br/><tab/>   template&lt;class T, class U&gt; bool operator==(const T&amp;, const optional&lt;U&gt;&amp;);
 <br/><tab/>   template&lt;class T, class U&gt; bool operator!=(const optional&lt;T&gt;&amp;, const U&amp;);
@@ -642,7 +690,7 @@ namespace pmr {
 <br/><tab2/>	compare_three_way_result_t&lt;T,U&gt;
 <br/><tab/><tab2/>      operator&lt;=&gt;(const optional&lt;T&gt;&amp;, const U&amp;);
 <br/>
- <br/><tab/> // [optional.specalg], specialized algorithms
+ <br/><tab/> // [pmroptional.specalg], specialized algorithms
 <br/><tab/>   template&lt;class T&gt;
 <br/><tab2/>    void swap(optional&lt;T&gt;&amp;, optional&lt;T&gt;&amp;) noexcept(<i>see below</i>);
 <br/>
@@ -662,7 +710,7 @@ namespace pmr {
 <br/><tab/>   template&lt;class T, class U, class... Args>
 <br/><tab2/>	constexpr optional&lt;T&gt; make_optional(allocator_arg_t, const polymorphic_allocator&lt;&gt;&amp; a, initializer_list&lt;U&gt; il, Args&amp;&amp;... args);
 <br/>
- <br/><tab/> // [optional.hash], hash support
+ <br/><tab/> // [pmroptional.hash], hash support
 <br/><tab/>   template&lt;class T&gt; struct hash&lt;optional&lt;T&gt;&gt;;
 <br/>}
 <!-- 
@@ -685,7 +733,7 @@ namespace std::pmr {
 <br/><tab2/> using value_type = T;
 <br/><tab2/> using allocator_type = std::pmr::polymorphic_allocator&lt;&gt;; // <i>not always defined, see below</i>
 <br/>
-<br/><tab2/>    // [optional.ctor], constructors
+<br/><tab2/>    // [pmroptional.ctor], constructors
     <br/><tab2/>optional() noexcept;
     <br/><tab2/>optional(nullopt_t) noexcept;
     <br/><tab2/>optional(const optional&amp;);
@@ -725,10 +773,10 @@ namespace std::pmr {
     <br/><tab2/>template&lt;class U&gt;
       <br/><tab2/><tab/>explicit(<i>see below</i>) optional(allocator_arg_t, const polymorphic_allocator&lt;&gt;&amp;,std::optional&lt;U&gt;&amp;&amp;);  // <i>not always provided, see below</i>
 <br/>
-<br/><tab2/>    // [optional.dtor], destructor
+<br/><tab2/>    // [pmroptional.dtor], destructor
 <br/><tab2/>    ~optional();
 <br/>
-<br/><tab2/>    // [optional.assign], assignment
+<br/><tab2/>    // [pmroptional.assign], assignment
 <br/><tab2/>    optional&amp; operator=(nullopt_t) noexcept;
 <br/><tab2/>    optional&amp; operator=(const optional&amp;);
 <br/><tab2/>    optional&amp; operator=(optional&amp;&amp;) noexcept(<i>see below</i>);
@@ -740,10 +788,10 @@ namespace std::pmr {
 <br/><tab2/>    template&lt;class... Args&gt;> T&amp; emplace(Args&amp;&amp;...);
 <br/><tab2/>    template&lt;class U, class... Args&gt; T&amp; emplace(initializer_list&lt;U&gt;, Args&amp;&amp;...);
 <br/>
-<br/><tab2/>    // [optional.swap], swap
+<br/><tab2/>    // [pmroptional.swap], swap
 <br/><tab2/>    void swap(optional&amp;) noexcept(<i>see below</i>);
 <br/>
-<br/><tab2/>    // [optional.observe], observers
+<br/><tab2/>    // [pmroptional.observe], observers
 <br/><tab2/>    const T* operator-&gt;() const;
 <br/><tab2/>    T* operator-&gt;();
 <br/><tab2/>    const T&amp; operator*() const&amp;;
@@ -763,7 +811,7 @@ namespace std::pmr {
 <br/><tab2/>    allocator_type get_allocator() const noexcept;
 
 <br/>
- <br/><tab2/>   // [optional.mod], modifiers
+ <br/><tab2/>   // [pmroptional.mod], modifiers
 <br/><tab2/>    void reset() noexcept;
 <br/>
 <br/><tab2/>  private:
