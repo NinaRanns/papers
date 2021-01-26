@@ -728,7 +728,7 @@ namespace pmr {
 <code>
 namespace std::pmr {
  <br/><tab/>   template&lt;class T&gt;
-<br/><tab/> class optional {
+<br/><tab/> class optional <i> see below</i>{
 <br/><tab/> public:
 <br/><tab2/> using value_type = T;
 <br/><tab2/> using allocator_type = std::pmr::polymorphic_allocator&lt;&gt;; // <i>not always defined, see below</i>
@@ -842,6 +842,9 @@ converted to bool, the conversion returns true if the object contains a value; o
 </ins></blockquote>
 <blockquote><ins>Member <tt>val</tt> is provided for exposition only. When an <i>optional</i>&lt;T&gt; 
 object contains a value, val points to the contained value.
+</ins></blockquote>
+<blockquote><ins>If and only if <tt>uses_allocator&lt;T, polymorphic_allocator&lt;&gt;&gt;</tt> is <tt>false</tt>, optional&lt;T&gt; publicly inherits from 
+std::optional&lt;T&gt;
 </ins></blockquote>
 <blockquote><ins>If and only if <tt>uses_allocator&lt;T, polymorphic_allocator&lt;&gt;&gt;</tt> is <tt>true</tt>, the following applies :
 <br/> - <tt>allocator_type</tt> will be defined,
