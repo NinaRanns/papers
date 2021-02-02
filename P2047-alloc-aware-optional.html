@@ -312,44 +312,44 @@ Add new paragraphs after 20.6.1/p1 [optional.general]
 <p>
 <br/><code>template&lt;class U&gt; explicit(<i>see below</i>) optional(const optional&lt;U&gt;&amp; v);</code>
 ...
-<br/><tab/><i>Remarks:</i> This constructor shall not participate in overload resolution unless
-<br/><tab2/> - <tt>is_­constructible_­v&lt;T, optional&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>, 
+<br/><tab/><i>Mandates:</i> 
+<br/><tab2/> - <tt>is_­constructible_­v&lt;T, optional&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>,
 <br/><tab2/><ins> - <tt>is_­constructible_­v&lt;T, pmr::optional&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>, </ins>
-<br/><tab2/> - <tt>is_­constructible_­v&lt;T, optional&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>, 
+<br/><tab2/> - <tt>is_­constructible_­v&lt;T, optional&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>,
 <br/><tab2/><ins> - <tt>is_­constructible_­v&lt;T, pmr::optional&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>, </ins>
-<br/><tab2/> - <tt>is_­constructible_­v&lt;T, const optional&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>, 
+<br/><tab2/> - <tt>is_­constructible_­v&lt;T, const optional&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>,
 <br/><tab2/><ins> - <tt>is_­constructible_­v&lt;T, const pmr::optional&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>, </ins>
-<br/><tab2/> - <tt>is_­constructible_­v&lt;T, const optional&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>, 
+<br/><tab2/> - <tt>is_­constructible_­v&lt;T, const optional&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>,
 <br/><tab2/><ins> - <tt>is_­constructible_­v&lt;T, const pmr::optional&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>, </ins>
-<br/><tab2/> - <tt>is_­convertible_­v&lt;optional&lt;U&gt;&amp;, T&gt;</tt> is <tt>false</tt>, 
+<br/><tab2/> - <tt>is_­convertible_­v&lt;optional&lt;U&gt;&amp;, T&gt;</tt> is <tt>false</tt>,
 <br/><tab2/><ins> - <tt>is_­convertible_­v&lt;pmr::optional&lt;U&gt;&amp;, T&gt;</tt> is <tt>false</tt>, </ins>
-<br/><tab2/> - <tt>is_­convertible_­v&lt;optional&lt;U&gt;&amp;&amp;, T&gt;</tt> is <tt>false</tt>, 
+<br/><tab2/> - <tt>is_­convertible_­v&lt;optional&lt;U&gt;&amp;&amp;, T&gt;</tt> is <tt>false</tt>,
 <br/><tab2/><ins> - <tt>is_­convertible_­v&lt;pmr::optional&lt;U&gt;&amp;&amp;, T&gt;</tt> is <tt>false</tt>, </ins>
 <br/><tab2/> - <tt>is_­convertible_­v&lt;const optional&lt;U&gt;&amp;, T&gt;</tt> is <tt>false</tt>, <del>and</del>
 <br/><tab2/><ins> - <tt>is_­convertible_­v&lt;const pmr::optional&lt;U&gt;&amp;, T&gt;</tt> is <tt>false</tt>, </ins>
-<br/><tab2/> - <tt>is_­convertible_­v&lt;const optional&lt;U&gt;&amp;&amp;, T&gt;</tt> is <tt>false</tt>,<ins>and</ins> 
+<br/><tab2/> - <tt>is_­convertible_­v&lt;const optional&lt;U&gt;&amp;&amp;, T&gt;</tt> is <tt>false</tt>,<ins>and</ins>
 <br/><tab2/><ins> - <tt>is_­convertible_­v&lt;const pmr::optional&lt;U&gt;&amp;&amp;, T&gt;</tt> is <tt>false</tt> </ins>
 ...
 </p>
 <p>
 <br/><code>template&lt;class U&gt; explicit(<i>see below</i>) optional(optional&lt;U&gt;&amp;&amp; v);</code>
 ...
-<br/><tab/><i>Remarks:</i> This constructor shall not participate in overload resolution unless
-<br/><tab2/> - <tt>is_­constructible_­v&lt;T, optional&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>, 
+<br/><tab/><i>Mandates:</i> 
+<br/><tab2/> - <tt>is_­constructible_­v&lt;T, optional&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>,
 <br/><tab2/><ins> - <tt>is_­constructible_­v&lt;T, pmr::optional&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>, </ins>
-<br/><tab2/> - <tt>is_­constructible_­v&lt;T, optional&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>, 
+<br/><tab2/> - <tt>is_­constructible_­v&lt;T, optional&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>,
 <br/><tab2/><ins> - <tt>is_­constructible_­v&lt;T, pmr::optional&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>, </ins>
-<br/><tab2/> - <tt>is_­constructible_­v&lt;T, const optional&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>, 
+<br/><tab2/> - <tt>is_­constructible_­v&lt;T, const optional&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>,
 <br/><tab2/><ins> - <tt>is_­constructible_­v&lt;T, const pmr::optional&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>, </ins>
-<br/><tab2/> - <tt>is_­constructible_­v&lt;T, const optional&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>, 
+<br/><tab2/> - <tt>is_­constructible_­v&lt;T, const optional&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>,
 <br/><tab2/><ins> - <tt>is_­constructible_­v&lt;T, const pmr::optional&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>, </ins>
-<br/><tab2/> - <tt>is_­convertible_­v&lt;optional&lt;U&gt;&amp;, T&gt;</tt> is <tt>false</tt>, 
+<br/><tab2/> - <tt>is_­convertible_­v&lt;optional&lt;U&gt;&amp;, T&gt;</tt> is <tt>false</tt>,
 <br/><tab2/><ins> - <tt>is_­convertible_­v&lt;pmr::optional&lt;U&gt;&amp;, T&gt;</tt> is <tt>false</tt>, </ins>
-<br/><tab2/> - <tt>is_­convertible_­v&lt;optional&lt;U&gt;&amp;&amp;, T&gt;</tt> is <tt>false</tt>, 
+<br/><tab2/> - <tt>is_­convertible_­v&lt;optional&lt;U&gt;&amp;&amp;, T&gt;</tt> is <tt>false</tt>,
 <br/><tab2/><ins> - <tt>is_­convertible_­v&lt;pmr::optional&lt;U&gt;&amp;&amp;, T&gt;</tt> is <tt>false</tt>, </ins>
 <br/><tab2/> - <tt>is_­convertible_­v&lt;const optional&lt;U&gt;&amp;, T&gt;</tt> is <tt>false</tt>, <del>and</del>
 <br/><tab2/><ins> - <tt>is_­convertible_­v&lt;const pmr::optional&lt;U&gt;&amp;, T&gt;</tt> is <tt>false</tt>, </ins>
-<br/><tab2/> - <tt>is_­convertible_­v&lt;const optional&lt;U&gt;&amp;&amp;, T&gt;</tt> is <tt>false</tt>, <ins>and</ins> 
+<br/><tab2/> - <tt>is_­convertible_­v&lt;const optional&lt;U&gt;&amp;&amp;, T&gt;</tt> is <tt>false</tt>, <ins>and</ins>
 <br/><tab2/><ins> - <tt>is_­convertible_­v&lt;const pmr::optional&lt;U&gt;&amp;&amp;, T&gt;</tt> is <tt>false</tt> </ins>
 ...
 </p>
@@ -362,27 +362,27 @@ Add new paragraphs after 20.6.1/p1 [optional.general]
  as if direct-non-list-initializing an object of type <tt>T</tt> with the expression <tt>*rhs</tt>.
 <br/><tab/><i>Ensures:</i> <tt>bool(rhs) == bool(*this)</tt>.
 <br/><tab/><i>Throws:</i> Any exception thrown by the selected constructor of <tt>T</tt>.
-<br/><tab/><i>Remarks:</i> This constructor shall not participate in overload resolution unless
-<br/><tab2/> - <tt>is_­constructible_­v&lt;T, const U&amp;&gt;</tt> is <tt>true</tt>, 
-<br/><tab2/> - <tt>is_same&lt;T,U&gt;</tt> is <tt>false</tt>, 
-<br/><tab2/> - <tt>is_­constructible_­v&lt;T, optional&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>, 
-<br/><tab2/> - <tt>is_­constructible_­v&lt;T, pmr::optional&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>, 
-<br/><tab2/> - <tt>is_­constructible_­v&lt;T, optional&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>, 
-<br/><tab2/> - <tt>is_­constructible_­v&lt;T, pmr::optional&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>, 
-<br/><tab2/> - <tt>is_­constructible_­v&lt;T, const optional&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>, 
-<br/><tab2/> - <tt>is_­constructible_­v&lt;T, const pmr::optional&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>, 
-<br/><tab2/> - <tt>is_­constructible_­v&lt;T, const optional&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>, 
-<br/><tab2/> - <tt>is_­constructible_­v&lt;T, const pmr::optional&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>, 
-<br/><tab2/> - <tt>is_­convertible_­v&lt;optional&lt;U&gt;&amp;, T&gt;</tt> is <tt>false</tt>, 
-<br/><tab2/> - <tt>is_­convertible_­v&lt;pmr::optional&lt;U&gt;&amp;, T&gt;</tt> is <tt>false</tt>, 
-<br/><tab2/> - <tt>is_­convertible_­v&lt;optional&lt;U&gt;&amp;&amp;, T&gt;</tt> is <tt>false</tt>, 
-<br/><tab2/> - <tt>is_­convertible_­v&lt;pmr::optional&lt;U&gt;&amp;&amp;, T&gt;</tt> is <tt>false</tt>, 
-<br/><tab2/> - <tt>is_­convertible_­v&lt;const optional&lt;U&gt;&amp;, T&gt;</tt> is <tt>false</tt>, 
-<br/><tab2/> - <tt>is_­convertible_­v&lt;const pmr::optional&lt;U&gt;&amp;, T&gt;</tt> is <tt>false</tt>, 
+<br/><tab/><i>Remarks:</i> <br/><tab/>The expression inside <tt>explicit</tt> is equivalent to:
+<br/><tab2/><tt>!is_convertible_v&lt;const U&amp;, T&gt;</tt>
+<br/><tab/><i>Mandates:</i>
+<br/><tab2/> - <tt>is_­constructible_­v&lt;T, const U&amp;&gt;</tt> is <tt>true</tt>,
+<br/><tab2/> - <tt>is_same&lt;T,U&gt;</tt> is <tt>false</tt>,
+<br/><tab2/> - <tt>is_­constructible_­v&lt;T, optional&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>,
+<br/><tab2/> - <tt>is_­constructible_­v&lt;T, pmr::optional&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>,
+<br/><tab2/> - <tt>is_­constructible_­v&lt;T, optional&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>,
+<br/><tab2/> - <tt>is_­constructible_­v&lt;T, pmr::optional&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>,
+<br/><tab2/> - <tt>is_­constructible_­v&lt;T, const optional&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>,
+<br/><tab2/> - <tt>is_­constructible_­v&lt;T, const pmr::optional&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>,
+<br/><tab2/> - <tt>is_­constructible_­v&lt;T, const optional&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>,
+<br/><tab2/> - <tt>is_­constructible_­v&lt;T, const pmr::optional&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>,
+<br/><tab2/> - <tt>is_­convertible_­v&lt;optional&lt;U&gt;&amp;, T&gt;</tt> is <tt>false</tt>,
+<br/><tab2/> - <tt>is_­convertible_­v&lt;pmr::optional&lt;U&gt;&amp;, T&gt;</tt> is <tt>false</tt>,
+<br/><tab2/> - <tt>is_­convertible_­v&lt;optional&lt;U&gt;&amp;&amp;, T&gt;</tt> is <tt>false</tt>,
+<br/><tab2/> - <tt>is_­convertible_­v&lt;pmr::optional&lt;U&gt;&amp;&amp;, T&gt;</tt> is <tt>false</tt>,
+<br/><tab2/> - <tt>is_­convertible_­v&lt;const optional&lt;U&gt;&amp;, T&gt;</tt> is <tt>false</tt>,
+<br/><tab2/> - <tt>is_­convertible_­v&lt;const pmr::optional&lt;U&gt;&amp;, T&gt;</tt> is <tt>false</tt>,
 <br/><tab2/> - <tt>is_­convertible_­v&lt;const optional&lt;U&gt;&amp;&amp;, T&gt;</tt> is <tt>false</tt>, and
-<br/><tab2/> - <tt>is_­convertible_­v&lt;const pmr::optional&lt;U&gt;&amp;&amp;, T&gt;</tt> is <tt>false</tt> 
-<br/><tab/>The expression inside <tt>explicit</tt> is equivalent to:
-<br/><tab2/><tt>!is_convertible_v&lt;const U&amp;, T&gt;</tt> 
+<br/><tab2/> - <tt>is_­convertible_­v&lt;const pmr::optional&lt;U&gt;&amp;&amp;, T&gt;</tt> is <tt>false</tt>
 <br/>     
 
 <br/>
@@ -392,27 +392,27 @@ Add new paragraphs after 20.6.1/p1 [optional.general]
 <tt>std​::​move(*rhs)</tt> as the constructor argument. <tt>bool(rhs)</tt> is unchanged.
 <br/><tab/><i>Ensures:</i> <tt>bool(rhs) == bool(*this)</tt>.
 <br/><tab/><i>Throws:</i> Any exception thrown by the selected constructor of <tt>T</tt>.
-<br/><tab/><i>Remarks:</i> This constructor shall not participate in overload resolution unless
-<br/><tab2/> - <tt>is_­constructible_­v&lt;T,U&amp;&amp;&gt;</tt> is <tt>true</tt>, 
-<br/><tab2/> - <tt>is_same&lt;T,U&gt;</tt> is <tt>false</tt>, 
-<br/><tab2/> - <tt>is_­constructible_­v&lt;T, optional&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>, 
-<br/><tab2/> - <tt>is_­constructible_­v&lt;T, pmr::optional&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>, 
-<br/><tab2/> - <tt>is_­constructible_­v&lt;T, optional&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>, 
-<br/><tab2/> - <tt>is_­constructible_­v&lt;T, pmr::optional&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>, 
-<br/><tab2/> - <tt>is_­constructible_­v&lt;T, const optional&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>, 
-<br/><tab2/> - <tt>is_­constructible_­v&lt;T, const pmr::optional&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>, 
-<br/><tab2/> - <tt>is_­constructible_­v&lt;T, const optional&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>, 
-<br/><tab2/> - <tt>is_­constructible_­v&lt;T, const pmr::optional&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>, 
-<br/><tab2/> - <tt>is_­convertible_­v&lt;optional&lt;U&gt;&amp;, T&gt;</tt> is <tt>false</tt>, 
-<br/><tab2/> - <tt>is_­convertible_­v&lt;pmr::optional&lt;U&gt;&amp;, T&gt;</tt> is <tt>false</tt>, 
-<br/><tab2/> - <tt>is_­convertible_­v&lt;optional&lt;U&gt;&amp;&amp;, T&gt;</tt> is <tt>false</tt>, 
-<br/><tab2/> - <tt>is_­convertible_­v&lt;pmr::optional&lt;U&gt;&amp;&amp;, T&gt;</tt> is <tt>false</tt>, 
-<br/><tab2/> - <tt>is_­convertible_­v&lt;const optional&lt;U&gt;&amp;, T&gt;</tt> is <tt>false</tt>, 
-<br/><tab2/> - <tt>is_­convertible_­v&lt;const pmr::optional&lt;U&gt;&amp;, T&gt;</tt> is <tt>false</tt>, 
+<br/><tab/><i>Remarks:</i> <br/><tab/>The expression inside <tt>explicit</tt> is equivalent to:
+<br/><tab2/><tt>!is_convertible_v&lt;U, T&gt;</tt>
+<br/><tab/><i>Mandates:</i>
+<br/><tab2/> - <tt>is_­constructible_­v&lt;T,U&amp;&amp;&gt;</tt> is <tt>true</tt>,
+<br/><tab2/> - <tt>is_same&lt;T,U&gt;</tt> is <tt>false</tt>,
+<br/><tab2/> - <tt>is_­constructible_­v&lt;T, optional&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>,
+<br/><tab2/> - <tt>is_­constructible_­v&lt;T, pmr::optional&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>,
+<br/><tab2/> - <tt>is_­constructible_­v&lt;T, optional&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>,
+<br/><tab2/> - <tt>is_­constructible_­v&lt;T, pmr::optional&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>,
+<br/><tab2/> - <tt>is_­constructible_­v&lt;T, const optional&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>,
+<br/><tab2/> - <tt>is_­constructible_­v&lt;T, const pmr::optional&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>,
+<br/><tab2/> - <tt>is_­constructible_­v&lt;T, const optional&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>,
+<br/><tab2/> - <tt>is_­constructible_­v&lt;T, const pmr::optional&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>,
+<br/><tab2/> - <tt>is_­convertible_­v&lt;optional&lt;U&gt;&amp;, T&gt;</tt> is <tt>false</tt>,
+<br/><tab2/> - <tt>is_­convertible_­v&lt;pmr::optional&lt;U&gt;&amp;, T&gt;</tt> is <tt>false</tt>,
+<br/><tab2/> - <tt>is_­convertible_­v&lt;optional&lt;U&gt;&amp;&amp;, T&gt;</tt> is <tt>false</tt>,
+<br/><tab2/> - <tt>is_­convertible_­v&lt;pmr::optional&lt;U&gt;&amp;&amp;, T&gt;</tt> is <tt>false</tt>,
+<br/><tab2/> - <tt>is_­convertible_­v&lt;const optional&lt;U&gt;&amp;, T&gt;</tt> is <tt>false</tt>,
+<br/><tab2/> - <tt>is_­convertible_­v&lt;const pmr::optional&lt;U&gt;&amp;, T&gt;</tt> is <tt>false</tt>,
 <br/><tab2/> - <tt>is_­convertible_­v&lt;const optional&lt;U&gt;&amp;&amp;, T&gt;</tt> is <tt>false</tt>, and
-<br/><tab2/> - <tt>is_­convertible_­v&lt;const pmr::optional&lt;U&gt;&amp;&amp;, T&gt;</tt> is <tt>false</tt> 
-<br/><tab/>The expression inside <tt>explicit</tt> is equivalent to:
-<br/><tab2/><tt>!is_convertible_v&lt;U, T&gt;</tt> 
+<br/><tab2/> - <tt>is_­convertible_­v&lt;const pmr::optional&lt;U&gt;&amp;&amp;, T&gt;</tt> is <tt>false</tt>
 <br/>    
 </p>
 </ins></blockquote>
