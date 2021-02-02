@@ -425,31 +425,31 @@ Add new paragraphs after 20.6.1/p1 [optional.general]
 ...
 <br/><tab/><i>Remarks:</i> ...
 This operator shall not participate in overload resolution unless
-<br/><tab2/> - <tt>is_­constructible_­v&lt;T, const U&amp;&gt;</tt> is <tt>true</tt>, 
+<br/><tab2/> - <tt>is_­constructible_­v&lt;T, const U&amp;&gt;</tt> is <tt>true</tt>,
 <br/><tab2/> - <tt>is_assignable&lt;T&amp;, const U&amp;&gt;</tt> is <tt>true</tt>,
-<br/><tab2/> - <tt>is_­constructible_­v&lt;T, optional&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>, 
+<br/><tab2/> - <tt>is_­constructible_­v&lt;T, optional&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>,
 <br/><tab2/><ins> - <tt>is_­constructible_­v&lt;T, pmr::optional&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>, </ins>
-<br/><tab2/> - <tt>is_­constructible_­v&lt;T, optional&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>, 
+<br/><tab2/> - <tt>is_­constructible_­v&lt;T, optional&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>,
 <br/><tab2/><ins>  - <tt>is_­constructible_­v&lt;T, pmr::optional&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>, </ins>
-<br/><tab2/> - <tt>is_­constructible_­v&lt;T, const optional&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>, 
+<br/><tab2/> - <tt>is_­constructible_­v&lt;T, const optional&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>,
 <br/><tab2/><ins>  - <tt>is_­constructible_­v&lt;T, const pmr::optional&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>, </ins>
-<br/><tab2/> - <tt>is_­constructible_­v&lt;T, const optional&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>, 
+<br/><tab2/> - <tt>is_­constructible_­v&lt;T, const optional&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>,
 <br/><tab2/><ins>  - <tt>is_­constructible_­v&lt;T, const pmr::optional&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>, </ins>
-<br/><tab2/> - <tt>is_­convertible_­v&lt;optional&lt;U&gt;&amp;, T&gt;</tt> is <tt>false</tt>, 
+<br/><tab2/> - <tt>is_­convertible_­v&lt;optional&lt;U&gt;&amp;, T&gt;</tt> is <tt>false</tt>,
 <br/><tab2/><ins>  - <tt>is_­convertible_­v&lt;pmr::optional&lt;U&gt;&amp;, T&gt;</tt> is <tt>false</tt>, </ins>
-<br/><tab2/> - <tt>is_­convertible_­v&lt;optional&lt;U&gt;&amp;&amp;, T&gt;</tt> is <tt>false</tt>, 
+<br/><tab2/> - <tt>is_­convertible_­v&lt;optional&lt;U&gt;&amp;&amp;, T&gt;</tt> is <tt>false</tt>,
 <br/><tab2/><ins>  - <tt>is_­convertible_­v&lt;pmr::optional&lt;U&gt;&amp;&amp;, T&gt;</tt> is <tt>false</tt>, </ins>
-<br/><tab2/> - <tt>is_­convertible_­v&lt;const optional&lt;U&gt;&amp;, T&gt;</tt> is <tt>false</tt>, 
+<br/><tab2/> - <tt>is_­convertible_­v&lt;const optional&lt;U&gt;&amp;, T&gt;</tt> is <tt>false</tt>,
 <br/><tab2/><ins>  - <tt>is_­convertible_­v&lt;const pmr::optional&lt;U&gt;&amp;, T&gt;</tt> is <tt>false</tt>, </ins>
 <br/><tab2/> - <tt>is_­convertible_­v&lt;const optional&lt;U&gt;&amp;&amp;, T&gt;</tt> is <tt>false</tt>,
 <br/><tab2/><ins>  - <tt>is_­convertible_­v&lt;const pmr::optional&lt;U&gt;&amp;&amp;, T&gt;</tt> is <tt>false</tt>, </ins>
-<br/><tab2/> - <tt>is_assignable_v&lt;T&amp;, optional&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>, 
+<br/><tab2/> - <tt>is_assignable_v&lt;T&amp;, optional&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>,
 <br/><tab2/><ins>  - <tt>is_assignable_v&lt;T&amp;, pmr::optional&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>, </ins>
-<br/><tab2/> - <tt>is_assignable_v&lt;T&amp;, optional&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>, 
+<br/><tab2/> - <tt>is_assignable_v&lt;T&amp;, optional&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>,
 <br/><tab2/><ins>  - <tt>is_assignable_v&lt;T&amp;, pmr::optional&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>, </ins>
 <br/><tab2/> - <tt>is_assignable_v&lt;T&amp;, const optional&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>, <del>and</del>
 <br/><tab2/><ins>  - <tt>is_assignable_v&lt;T&amp;, const pmr::optional&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>, </ins>
-<br/><tab2/> - <tt>is_assignable_v&lt;T&amp;, const optional&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>,<ins>and</ins> 
+<br/><tab2/> - <tt>is_assignable_v&lt;T&amp;, const optional&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>,<ins>and</ins>
 <br/><tab2/><ins>  - <tt>is_assignable_v&lt;T&amp;, const pmr::optional&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt> </ins>
 </blockquote>
 </p>
@@ -460,27 +460,27 @@ This operator shall not participate in overload resolution unless
 ...
 <br/><tab/><i>Remarks:</i> ...
 This operator shall not participate in overload resolution unless
-<br/><tab2/> - <tt>is_­constructible_­v&lt;T, const U&amp;&gt;</tt> is <tt>true</tt>, 
+<br/><tab2/> - <tt>is_­constructible_­v&lt;T, const U&amp;&gt;</tt> is <tt>true</tt>,
 <br/><tab2/> - <tt>is_assignable&lt;T&amp;, const U&amp;&gt;</tt> is <tt>true</tt>,
-<br/><tab2/> - <tt>is_­constructible_­v&lt;T, optional&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>, 
+<br/><tab2/> - <tt>is_­constructible_­v&lt;T, optional&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>,
 <br/><tab2/><ins> - <tt>is_­constructible_­v&lt;T, pmr::optional&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>, </ins>
-<br/><tab2/> - <tt>is_­constructible_­v&lt;T, optional&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>, 
+<br/><tab2/> - <tt>is_­constructible_­v&lt;T, optional&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>,
 <br/><tab2/><ins>  - <tt>is_­constructible_­v&lt;T, pmr::optional&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>, </ins>
-<br/><tab2/> - <tt>is_­constructible_­v&lt;T, const optional&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>, 
+<br/><tab2/> - <tt>is_­constructible_­v&lt;T, const optional&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>,
 <br/><tab2/><ins>  - <tt>is_­constructible_­v&lt;T, const pmr::optional&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>, </ins>
-<br/><tab2/> - <tt>is_­constructible_­v&lt;T, const optional&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>, 
+<br/><tab2/> - <tt>is_­constructible_­v&lt;T, const optional&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>,
 <br/><tab2/><ins>  - <tt>is_­constructible_­v&lt;T, const pmr::optional&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>, </ins>
-<br/><tab2/> - <tt>is_­convertible_­v&lt;optional&lt;U&gt;&amp;, T&gt;</tt> is <tt>false</tt>, 
+<br/><tab2/> - <tt>is_­convertible_­v&lt;optional&lt;U&gt;&amp;, T&gt;</tt> is <tt>false</tt>,
 <br/><tab2/><ins>  - <tt>is_­convertible_­v&lt;pmr::optional&lt;U&gt;&amp;, T&gt;</tt> is <tt>false</tt>, </ins>
-<br/><tab2/> - <tt>is_­convertible_­v&lt;optional&lt;U&gt;&amp;&amp;, T&gt;</tt> is <tt>false</tt>, 
+<br/><tab2/> - <tt>is_­convertible_­v&lt;optional&lt;U&gt;&amp;&amp;, T&gt;</tt> is <tt>false</tt>,
 <br/><tab2/><ins>  - <tt>is_­convertible_­v&lt;pmr::optional&lt;U&gt;&amp;&amp;, T&gt;</tt> is <tt>false</tt>, </ins>
-<br/><tab2/> - <tt>is_­convertible_­v&lt;const optional&lt;U&gt;&amp;, T&gt;</tt> is <tt>false</tt>, 
+<br/><tab2/> - <tt>is_­convertible_­v&lt;const optional&lt;U&gt;&amp;, T&gt;</tt> is <tt>false</tt>,
 <br/><tab2/><ins>  - <tt>is_­convertible_­v&lt;const pmr::optional&lt;U&gt;&amp;, T&gt;</tt> is <tt>false</tt>, </ins>
 <br/><tab2/> - <tt>is_­convertible_­v&lt;const optional&lt;U&gt;&amp;&amp;, T&gt;</tt> is <tt>false</tt>,
 <br/><tab2/><ins>  - <tt>is_­convertible_­v&lt;const pmr::optional&lt;U&gt;&amp;&amp;, T&gt;</tt> is <tt>false</tt>, </ins>
-<br/><tab2/> - <tt>is_assignable_v&lt;T&amp;, optional&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>, 
+<br/><tab2/> - <tt>is_assignable_v&lt;T&amp;, optional&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>,
 <br/><tab2/><ins>  - <tt>is_assignable_v&lt;T&amp;, pmr::optional&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>, </ins>
-<br/><tab2/> - <tt>is_assignable_v&lt;T&amp;, optional&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>, 
+<br/><tab2/> - <tt>is_assignable_v&lt;T&amp;, optional&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>,
 <br/><tab2/><ins>  - <tt>is_assignable_v&lt;T&amp;, pmr::optional&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>, </ins>
 <br/><tab2/> - <tt>is_assignable_v&lt;T&amp;, const optional&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>, <del>and</del>
 <br/><tab2/><ins>  - <tt>is_assignable_v&lt;T&amp;, const pmr::optional&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>, </ins>
@@ -515,37 +515,37 @@ This operator shall not participate in overload resolution unless
 <br/><tab/><i>Returns:</i> <tt>*this</tt>.
 <br/><tab/><i>Ensures:</i> <tt>bool(rhs) == bool(*this)</tt>.
 <br/><tab/><i>Remarks:</i>  If any exception is thrown, the result of the expression <tt>bool(*this)</tt>
-remains unchanged. If an exception is thrown during the call to <tt>T</tt>'s constructor, 
-the state of <tt>*rhs.val</tt> is determined by the exception safety guarantee of <tt>T</tt>'s constructor. 
-If an exception is thrown during the call to <tt>T</tt>'s assignment, the state of <tt>*val</tt> and <tt>*rhs.val</tt> is 
+remains unchanged. If an exception is thrown during the call to <tt>T</tt>'s constructor,
+the state of <tt>*rhs.val</tt> is determined by the exception safety guarantee of <tt>T</tt>'s constructor.
+If an exception is thrown during the call to <tt>T</tt>'s assignment, the state of <tt>*val</tt> and <tt>*rhs.val</tt> is
 determined by the exception safety guarantee of <tt>T</tt>'s assignment.
-This operator shall not participate in overload resolution unless
-<br/><tab2/> - <tt>is_same&lt;T,U&gt;</tt> is <tt>false</tt>, 
-<br/><tab2/> - <tt>is_­constructible_­v&lt;T, const U&amp;&gt;</tt> is <tt>true</tt>, 
+<br/><tab/><i>Mandates:</i>
+<br/><tab2/> - <tt>is_same&lt;T,U&gt;</tt> is <tt>false</tt>,
+<br/><tab2/> - <tt>is_­constructible_­v&lt;T, const U&amp;&gt;</tt> is <tt>true</tt>,
 <br/><tab2/> - <tt>is_assignable&lt;T&amp;, const U&amp;&gt;</tt> is <tt>true</tt>,
-<br/><tab2/> - <tt>is_­constructible_­v&lt;T, optional&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>, 
-<br/><tab2/> - <tt>is_­constructible_­v&lt;T, pmr::optional&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>, 
+<br/><tab2/> - <tt>is_­constructible_­v&lt;T, optional&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>,
+<br/><tab2/> - <tt>is_­constructible_­v&lt;T, pmr::optional&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>,
 <br/><tab2/> - <tt>is_­constructible_­v&lt;T, optional&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>, 
-<br/><tab2/> - <tt>is_­constructible_­v&lt;T, pmr::optional&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>, 
-<br/><tab2/> - <tt>is_­constructible_­v&lt;T, const optional&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>, 
-<br/><tab2/> - <tt>is_­constructible_­v&lt;T, const pmr::optional&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>, 
+<br/><tab2/> - <tt>is_­constructible_­v&lt;T, pmr::optional&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>,
+<br/><tab2/> - <tt>is_­constructible_­v&lt;T, const optional&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>,
+<br/><tab2/> - <tt>is_­constructible_­v&lt;T, const pmr::optional&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>,
 <br/><tab2/> - <tt>is_­constructible_­v&lt;T, const optional&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>, 
-<br/><tab2/> - <tt>is_­constructible_­v&lt;T, const pmr::optional&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>, 
-<br/><tab2/> - <tt>is_­convertible_­v&lt;const U&amp;, T&gt;</tt> is <tt>true</tt>, 
-<br/><tab2/> - <tt>is_­convertible_­v&lt;optional&lt;U&gt;&amp;, T&gt;</tt> is <tt>false</tt>, 
-<br/><tab2/> - <tt>is_­convertible_­v&lt;pmr::optional&lt;U&gt;&amp;, T&gt;</tt> is <tt>false</tt>, 
+<br/><tab2/> - <tt>is_­constructible_­v&lt;T, const pmr::optional&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>,
+<br/><tab2/> - <tt>is_­convertible_­v&lt;const U&amp;, T&gt;</tt> is <tt>true</tt>,
+<br/><tab2/> - <tt>is_­convertible_­v&lt;optional&lt;U&gt;&amp;, T&gt;</tt> is <tt>false</tt>,
+<br/><tab2/> - <tt>is_­convertible_­v&lt;pmr::optional&lt;U&gt;&amp;, T&gt;</tt> is <tt>false</tt>,
 <br/><tab2/> - <tt>is_­convertible_­v&lt;optional&lt;U&gt;&amp;&amp;, T&gt;</tt> is <tt>false</tt>, 
-<br/><tab2/> - <tt>is_­convertible_­v&lt;pmr::optional&lt;U&gt;&amp;&amp;, T&gt;</tt> is <tt>false</tt>, 
-<br/><tab2/> - <tt>is_­convertible_­v&lt;const optional&lt;U&gt;&amp;, T&gt;</tt> is <tt>false</tt>, 
-<br/><tab2/> - <tt>is_­convertible_­v&lt;const pmr::optional&lt;U&gt;&amp;, T&gt;</tt> is <tt>false</tt>, 
+<br/><tab2/> - <tt>is_­convertible_­v&lt;pmr::optional&lt;U&gt;&amp;&amp;, T&gt;</tt> is <tt>false</tt>,
+<br/><tab2/> - <tt>is_­convertible_­v&lt;const optional&lt;U&gt;&amp;, T&gt;</tt> is <tt>false</tt>,
+<br/><tab2/> - <tt>is_­convertible_­v&lt;const pmr::optional&lt;U&gt;&amp;, T&gt;</tt> is <tt>false</tt>,
 <br/><tab2/> - <tt>is_­convertible_­v&lt;const optional&lt;U&gt;&amp;&amp;, T&gt;</tt> is <tt>false</tt>,
-<br/><tab2/> - <tt>is_­convertible_­v&lt;const pmr::optional&lt;U&gt;&amp;&amp;, T&gt;</tt> is <tt>false</tt>, 
-<br/><tab2/> - <tt>is_assignable_v&lt;T&amp;, optional&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>, 
-<br/><tab2/> - <tt>is_assignable_v&lt;T&amp;, pmr::optional&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>, 
+<br/><tab2/> - <tt>is_­convertible_­v&lt;const pmr::optional&lt;U&gt;&amp;&amp;, T&gt;</tt> is <tt>false</tt>,
+<br/><tab2/> - <tt>is_assignable_v&lt;T&amp;, optional&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>,
+<br/><tab2/> - <tt>is_assignable_v&lt;T&amp;, pmr::optional&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>,
 <br/><tab2/> - <tt>is_assignable_v&lt;T&amp;, optional&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>, 
-<br/><tab2/> - <tt>is_assignable_v&lt;T&amp;, pmr::optional&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>, 
-<br/><tab2/> - <tt>is_assignable_v&lt;T&amp;, const optional&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>, 
-<br/><tab2/> - <tt>is_assignable_v&lt;T&amp;, const pmr::optional&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>, 
+<br/><tab2/> - <tt>is_assignable_v&lt;T&amp;, pmr::optional&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>,
+<br/><tab2/> - <tt>is_assignable_v&lt;T&amp;, const optional&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>,
+<br/><tab2/> - <tt>is_assignable_v&lt;T&amp;, const pmr::optional&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>,
 <br/><tab2/> - <tt>is_assignable_v&lt;T&amp;, const optional&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>, and
 <br/><tab2/> - <tt>is_assignable_v&lt;T&amp;, const pmr::optional&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>
 
@@ -574,36 +574,36 @@ This operator shall not participate in overload resolution unless
 <br/><tab/><i>Returns:</i> <tt>*this</tt>.
 <br/><tab/><i>Ensures:</i> <tt>bool(rhs) == bool(*this)</tt>.
 <br/><tab/><i>Remarks:</i>   If any exception is thrown, the result of the expression <tt>bool(*this)</tt>
-remains unchanged. If an exception is thrown during the call to <tt>T</tt>'s constructor, 
-the state of <tt>*rhs.val</tt> is determined by the exception safety guarantee of <tt>T</tt>'s constructor. 
-If an exception is thrown during the call to <tt>T</tt>'s assignment, the state of <tt>*val</tt> and <tt>*rhs.val</tt> is 
+remains unchanged. If an exception is thrown during the call to <tt>T</tt>'s constructor,
+the state of <tt>*rhs.val</tt> is determined by the exception safety guarantee of <tt>T</tt>'s constructor.
+If an exception is thrown during the call to <tt>T</tt>'s assignment, the state of <tt>*val</tt> and <tt>*rhs.val</tt> is
 determined by the exception safety guarantee of <tt>T</tt>'s assignment.
 This operator shall not participate in overload resolution unless
-<br/><tab2/> - <tt>is_­constructible_­v&lt;T, const U&amp;&gt;</tt> is <tt>true</tt>, 
+<br/><tab2/> - <tt>is_­constructible_­v&lt;T, const U&amp;&gt;</tt> is <tt>true</tt>,
 <br/><tab2/> - <tt>is_assignable&lt;T&amp;, const U&amp;&gt;</tt> is <tt>true</tt>,
-<br/><tab2/> - <tt>is_­constructible_­v&lt;T, std::optional&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>, 
+<br/><tab2/> - <tt>is_­constructible_­v&lt;T, std::optional&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>,
 <br/><tab2/> - <tt>is_­constructible_­v&lt;T, pmr::optional&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>, 
-<br/><tab2/> - <tt>is_­constructible_­v&lt;T, std::optional&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>, 
+<br/><tab2/> - <tt>is_­constructible_­v&lt;T, std::optional&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>,
 <br/><tab2/> - <tt>is_­constructible_­v&lt;T, pmr::optional&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>, 
-<br/><tab2/> - <tt>is_­constructible_­v&lt;T, const std::optional&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>, 
-<br/><tab2/> - <tt>is_­constructible_­v&lt;T, const pmr::optional&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>, 
-<br/><tab2/> - <tt>is_­constructible_­v&lt;T, const std::optional&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>, 
-<br/><tab2/> - <tt>is_­constructible_­v&lt;T, const pmr::optional&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>, 
-<br/><tab2/> - <tt>is_­convertible_­v&lt;const U&amp;, T&gt;</tt> is <tt>true</tt>, 
-<br/><tab2/> - <tt>is_­convertible_­v&lt;std::optional&lt;U&gt;&amp;, T&gt;</tt> is <tt>false</tt>, 
-<br/><tab2/> - <tt>is_­convertible_­v&lt;pmr::optional&lt;U&gt;&amp;, T&gt;</tt> is <tt>false</tt>, 
-<br/><tab2/> - <tt>is_­convertible_­v&lt;std::optional&lt;U&gt;&amp;&amp;, T&gt;</tt> is <tt>false</tt>, 
-<br/><tab2/> - <tt>is_­convertible_­v&lt;pmr::optional&lt;U&gt;&amp;&amp;, T&gt;</tt> is <tt>false</tt>, 
-<br/><tab2/> - <tt>is_­convertible_­v&lt;const std::optional&lt;U&gt;&amp;, T&gt;</tt> is <tt>false</tt>, 
-<br/><tab2/> - <tt>is_­convertible_­v&lt;const pmr::optional&lt;U&gt;&amp;, T&gt;</tt> is <tt>false</tt>, 
+<br/><tab2/> - <tt>is_­constructible_­v&lt;T, const std::optional&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>,
+<br/><tab2/> - <tt>is_­constructible_­v&lt;T, const pmr::optional&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>,
+<br/><tab2/> - <tt>is_­constructible_­v&lt;T, const std::optional&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>,
+<br/><tab2/> - <tt>is_­constructible_­v&lt;T, const pmr::optional&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>,
+<br/><tab2/> - <tt>is_­convertible_­v&lt;const U&amp;, T&gt;</tt> is <tt>true</tt>,
+<br/><tab2/> - <tt>is_­convertible_­v&lt;std::optional&lt;U&gt;&amp;, T&gt;</tt> is <tt>false</tt>,
+<br/><tab2/> - <tt>is_­convertible_­v&lt;pmr::optional&lt;U&gt;&amp;, T&gt;</tt> is <tt>false</tt>,
+<br/><tab2/> - <tt>is_­convertible_­v&lt;std::optional&lt;U&gt;&amp;&amp;, T&gt;</tt> is <tt>false</tt>,
+<br/><tab2/> - <tt>is_­convertible_­v&lt;pmr::optional&lt;U&gt;&amp;&amp;, T&gt;</tt> is <tt>false</tt>,
+<br/><tab2/> - <tt>is_­convertible_­v&lt;const std::optional&lt;U&gt;&amp;, T&gt;</tt> is <tt>false</tt>,
+<br/><tab2/> - <tt>is_­convertible_­v&lt;const pmr::optional&lt;U&gt;&amp;, T&gt;</tt> is <tt>false</tt>,
 <br/><tab2/> - <tt>is_­convertible_­v&lt;const std::optional&lt;U&gt;&amp;&amp;, T&gt;</tt> is <tt>false</tt>,
-<br/><tab2/> - <tt>is_­convertible_­v&lt;const pmr::optional&lt;U&gt;&amp;&amp;, T&gt;</tt> is <tt>false</tt>, 
-<br/><tab2/> - <tt>is_assignable_v&lt;T&amp;, std::optional&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>, 
-<br/><tab2/> - <tt>is_assignable_v&lt;T&amp;, pmr::optional&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>, 
-<br/><tab2/> - <tt>is_assignable_v&lt;T&amp;, std::optional&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>, 
-<br/><tab2/> - <tt>is_assignable_v&lt;T&amp;, pmr::optional&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>, 
-<br/><tab2/> - <tt>is_assignable_v&lt;T&amp;, const std::optional&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>, 
-<br/><tab2/> - <tt>is_assignable_v&lt;T&amp;, const pmr::optional&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>, 
+<br/><tab2/> - <tt>is_­convertible_­v&lt;const pmr::optional&lt;U&gt;&amp;&amp;, T&gt;</tt> is <tt>false</tt>,
+<br/><tab2/> - <tt>is_assignable_v&lt;T&amp;, std::optional&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>,
+<br/><tab2/> - <tt>is_assignable_v&lt;T&amp;, pmr::optional&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>,
+<br/><tab2/> - <tt>is_assignable_v&lt;T&amp;, std::optional&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>,
+<br/><tab2/> - <tt>is_assignable_v&lt;T&amp;, pmr::optional&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>,
+<br/><tab2/> - <tt>is_assignable_v&lt;T&amp;, const std::optional&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>,
+<br/><tab2/> - <tt>is_assignable_v&lt;T&amp;, const pmr::optional&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>,
 <br/><tab2/> - <tt>is_assignable_v&lt;T&amp;, const std::optional&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>, and
 <br/><tab2/> - <tt>is_assignable_v&lt;T&amp;, const pmr::optional&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>
 
@@ -841,7 +841,7 @@ constructed by uses-allocator construction
 with allocator <tt><i>M_alloc</i></tt>. When an object of type <i>optional</i>&lt;T&gt; is contextually 
 converted to bool, the conversion returns true if the object contains a value; otherwise the conversion returns false.
 </ins></blockquote>
-<blockquote><ins>Member <tt>val</tt> is provided for exposition only. When an <i>optional</i>&lt;T&gt; 
+<blockquote><ins>Member <tt>val</tt> is provided for exposition only. When an <i>optional</i>&lt;T&gt;
 object contains a value, val points to the contained value.
 </ins></blockquote>
 <blockquote><ins>If and only if <tt>uses_allocator&lt;T, polymorphic_allocator&lt;&gt;&gt;</tt> is <tt>false</tt>, optional&lt;T&gt; publicly inherits from 
@@ -884,8 +884,8 @@ If <tt>rhs</tt> contains a value, initializes the contained value
 with the expression <tt>std​::​move(*rhs)</tt>. <tt>bool(rhs)</tt> is unchanged.
 <br/><tab/><i>Ensures:</i> <tt>bool(rhs) == bool(*this)</tt>.
 <br/><tab/><i>Throws:</i> Any exception thrown by the selected constructor of <tt>T</tt>.
-<br/><tab/><i>Remarks:</i> The expression inside <tt>noexcept</tt> is equivalent to <tt>is_­nothrow_­move_­constructible_­v&lt;T&gt;</tt>. 
-This constructor shall not participate in overload resolution unless <tt>is_­move_­constructible_­v&lt;T&gt;</tt> is true.
+<br/><tab/><i>Remarks:</i> The expression inside <tt>noexcept</tt> is equivalent to <tt>is_­nothrow_­move_­constructible_­v&lt;T&gt;</tt>.
+<br/><tab/><i>Mandates:</i><tt>is_­move_­constructible_­v&lt;T&gt;</tt> is true.
 
 
 <br/>
@@ -894,7 +894,7 @@ This constructor shall not participate in overload resolution unless <tt>is_­mo
 Initializes the contained value with <tt>std​::​forward&lt;Args&gt;(args)....</tt>. 
 <br/><tab/><i>Ensures:</i> <tt>*this</tt> contains a value..
 <br/><tab/><i>Throws:</i> Any exception thrown by the selected constructor of <tt>T</tt>.
-<br/><tab/><i>Remarks:</i> This constructor shall not participate in overload resolution unless <tt>is_­copy_­constructible_­v&lt;T&gt;</tt> is true.
+<br/><tab/><i>Mandates:</i><tt>is_­copy_­constructible_­v&lt;T&gt;</tt> is true.
 
 <br/>
 <br/><code>template&lt;class... Args&gt; explicit optional(in_place_t, initializer_list&lt;U&gt; il, Args&amp;&amp;... args);</code>
@@ -902,7 +902,7 @@ Initializes the contained value with <tt>std​::​forward&lt;Args&gt;(args)...
 Initializes the contained value with <tt>il and std​::​forward&lt;Args&gt;(args)....</tt>.
 <br/><tab/><i>Ensures:</i> <tt>*this</tt> contains a value..
 <br/><tab/><i>Throws:</i> Any exception thrown by the selected constructor of <tt>T</tt>.
-<br/><tab/><i>Remarks:</i> This constructor shall not participate in overload resolution unless
+<br/><tab/><i>Mandates:</i><tt>is_­constructible_­v&lt;T, initializer_­list&lt;U&gt;&amp;, Args&amp;&amp;...&gt;</tt> is true.
 <tt>is_­constructible_­v&lt;T, initializer_­list&lt;U&gt;&amp;, Args&amp;&amp;...&gt;</tt> is true.
   
 <br/>
@@ -911,13 +911,13 @@ Initializes the contained value with <tt>il and std​::​forward&lt;Args&gt;(a
 Initializes the contained value with <tt> std​::​forward&lt;U&gt;(rhs)</tt>. 
 <br/><tab/><i>Ensures:</i> <tt>*this</tt> contains a value.
 <br/><tab/><i>Throws:</i> Any exception thrown by the selected constructor of <tt>T</tt>.
-<br/><tab/><i>Remarks:</i> This constructor shall not participate in overload resolution unless
-<br/><tab2/> - <tt>is_­constructible_­v&lt;T, U&amp;&amp;&gt;</tt> is <tt>true</tt>, 
+<br/><tab/><i>Remarks:</i>The expression inside <tt>explicit</tt> is equivalent to:
+<br/><tab2/><tt>!is_convertible_v&lt;U, T&gt;</tt> 
+<br/><tab/><i>Mandates:</i>
+<br/><tab2/> - <tt>is_­constructible_­v&lt;T, U&amp;&amp;&gt;</tt> is <tt>true</tt>,
 <br/><tab2/> - <tt>is_­same_­v&lt;remove_­cvref_­t&lt;U&gt;, in_­place_­t&gt</tt>
 is <tt>false</tt>, and
 <br/><tab2/> - <tt>is_­same_­v&lt;remove_­cvref_­t&lt;U&gt;,optional&gt</tt> is <tt>false</tt>. 
-<br/><tab/>The expression inside <tt>explicit</tt> is equivalent to:
-<br/><tab2/><tt>!is_convertible_v&lt;U, T&gt;</tt> 
 
 <br/>
 <br/><code>template&lt;class U&gt; explicit(<i>see below</i>) optional(const optional&lt;U&gt;&amp; rhs);</code>
@@ -925,7 +925,9 @@ is <tt>false</tt>, and
 If <tt>rhs</tt> contains a value, initializes the contained value with <tt>*rhs</tt>. 
 <br/><tab/><i>Ensures:</i> <tt>bool(rhs) == bool(*this)</tt>.
 <br/><tab/><i>Throws:</i> Any exception thrown by the selected constructor of <tt>T</tt>.
-<br/><tab/><i>Remarks:</i> This constructor shall not participate in overload resolution unless
+<br/><tab/><i>Remarks:</i>The expression inside <tt>explicit</tt> is equivalent to:
+<br/><tab2/><tt>!is_convertible_v&lt;const U&amp;, T&gt;</tt>
+<br/><tab/><i>Mandates:</i>
 <br/><tab2/> - <tt>is_­constructible_­v&lt;T, const U&amp;&gt;</tt> is <tt>true</tt>, 
 <br/><tab2/> - <tt>is_­constructible_­v&lt;T, std::optional&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>, 
 <br/><tab2/> - <tt>is_­constructible_­v&lt;T, optional&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>, 
@@ -943,8 +945,6 @@ If <tt>rhs</tt> contains a value, initializes the contained value with <tt>*rhs<
 <br/><tab2/> - <tt>is_­convertible_­v&lt;const optional&lt;U&gt;&amp;, T&gt;</tt> is <tt>false</tt>, 
 <br/><tab2/> - <tt>is_­convertible_­v&lt;const std::optional&lt;U&gt;&amp;&amp;, T&gt;</tt> is <tt>false</tt>, and
 <br/><tab2/> - <tt>is_­convertible_­v&lt;const optional&lt;U&gt;&amp;&amp;, T&gt;</tt> is <tt>false</tt> 
-<br/><tab/>The expression inside <tt>explicit</tt> is equivalent to:
-<br/><tab2/><tt>!is_convertible_v&lt;const U&amp;, T&gt;</tt> 
 <br/>     
 
 
@@ -954,7 +954,9 @@ If <tt>rhs</tt> contains a value, initializes the contained value with <tt>*rhs<
 If <tt>rhs</tt> contains a value, initializes the contained valuewith <tt>std​::​move(*rhs)</tt>. <tt>bool(rhs)</tt> is unchanged.
 <br/><tab/><i>Ensures:</i> <tt>bool(rhs) == bool(*this)</tt>.
 <br/><tab/><i>Throws:</i> Any exception thrown by the selected constructor of <tt>T</tt>.
-<br/><tab/><i>Remarks:</i> This constructor shall not participate in overload resolution unless
+<br/><tab/><i>Remarks:</i>The expression inside <tt>explicit</tt> is equivalent to:
+<br/><tab2/><tt>!is_convertible_v&lt;U, T&gt;</tt 
+<br/><tab/><i>Mandates:</i>
 <br/><tab2/> - <tt>is_­constructible_­v&lt;T,U&amp;&amp;&gt;</tt> is <tt>true</tt>, 
 <br/><tab2/> - <tt>is_­constructible_­v&lt;T, std::optional&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>, 
 <br/><tab2/> - <tt>is_­constructible_­v&lt;T, optional&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>, 
@@ -972,8 +974,6 @@ If <tt>rhs</tt> contains a value, initializes the contained valuewith <tt>std​
 <br/><tab2/> - <tt>is_­convertible_­v&lt;const optional&lt;U&gt;&amp;, T&gt;</tt> is <tt>false</tt>, 
 <br/><tab2/> - <tt>is_­convertible_­v&lt;const std::optional&lt;U&gt;&amp;&amp;, T&gt;</tt> is <tt>false</tt>, and
 <br/><tab2/> - <tt>is_­convertible_­v&lt;const optional&lt;U&gt;&amp;&amp;, T&gt;</tt> is <tt>false</tt> 
-<br/><tab/>The expression inside <tt>explicit</tt> is equivalent to:
-<br/><tab2/><tt>!is_convertible_v&lt;U, T&gt;</tt> 
 <br/>    
 
 <br/>
@@ -982,7 +982,9 @@ If <tt>rhs</tt> contains a value, initializes the contained valuewith <tt>std​
 If <tt>rhs</tt> contains a value, initializes the contained value with <tt>*rhs</tt>. 
 <br/><tab/><i>Ensures:</i> <tt>bool(rhs) == bool(*this)</tt>.
 <br/><tab/><i>Throws:</i> Any exception thrown by the selected constructor of <tt>T</tt>.
-<br/><tab/><i>Remarks:</i> This constructor shall not participate in overload resolution unless
+<br/><tab/><i>Remarks:</i>The expression inside <tt>explicit</tt> is equivalent to:
+<br/><tab2/><tt>!is_convertible_v&lt;const U&amp;, T&gt;</tt>
+<br/><tab/><i>Mandates:</i>
 <br/><tab2/> - <tt>is_­constructible_­v&lt;T, const U&amp;&gt;</tt> is <tt>true</tt>, 
 <br/><tab2/> - <tt>is_­constructible_­v&lt;T, std::optional&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>, 
 <br/><tab2/> - <tt>is_­constructible_­v&lt;T, optional&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>, 
@@ -1000,8 +1002,6 @@ If <tt>rhs</tt> contains a value, initializes the contained value with <tt>*rhs<
 <br/><tab2/> - <tt>is_­convertible_­v&lt;const optional&lt;U&gt;&amp;, T&gt;</tt> is <tt>false</tt>, 
 <br/><tab2/> - <tt>is_­convertible_­v&lt;const std::optional&lt;U&gt;&amp;&amp;, T&gt;</tt> is <tt>false</tt>, and
 <br/><tab2/> - <tt>is_­convertible_­v&lt;const optional&lt;U&gt;&amp;&amp;, T&gt;</tt> is <tt>false</tt> 
-<br/><tab/>The expression inside <tt>explicit</tt> is equivalent to:
-<br/><tab2/><tt>!is_convertible_v&lt;const U&amp;, T&gt;</tt> 
 <br/>     
 
 
