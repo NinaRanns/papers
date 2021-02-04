@@ -52,7 +52,7 @@ Audience: LEWG
 <p>
   The current definition of <tt>std::optional</tt> does not follow the rules
   for an AA type, even when holding an AA value. This limitation
-  makes <tt>optional</tt> unsuitable for storage in an AA container when
+  makes <tt>std::optional</tt> unsuitable for storage in an AA container when
   memory allocation customization is needed.
 </p>
 <p>
@@ -81,7 +81,7 @@ do any allocation, and that the name is not appropriate
 <br/>- removed mentions of using a type alias since the type alias approach has proven to be problematic
 <br/>- modified the specification of std::pmr::optional to cover both AA and non AA types
 <br/>- added CTAD specification
-<br/>- modified the specification of std::pmr::optional to be expressed in terms of 
+<br/>- modified the specification of <tt>std::pmr::optional</tt> to be expressed in terms of 
 	<tt>std::pmr::polymorphic_allocator&lt;&gt;</tt>, as opposed to <tt>std::pmr::memory_resource</tt>
 gt;</p>
 
