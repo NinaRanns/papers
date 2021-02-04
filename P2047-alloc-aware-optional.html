@@ -181,7 +181,10 @@ and using the nested <tt>type</tt> of the <tt>conditional</tt> as the function t
 <h2>Feedback items for LEWG: </h2>
 
 <p>
-
+	<h3>Should pmr::optional be placed in the <tt>&lt;optional&gt;</tt> header?</p>
+</h3>
+<br/> This proposal puts pmr::optional in a new header.	Historically, pmr containers didn't have their own header files. However, 
+	<tt>std::pmr::optional</tt> is a more complex type than, for example, <tt>std::pmr::vector</tt>.
 <h3>Should the deduction guide for mixed optional unpack or not?</p>
 </h3>
 <p>
@@ -257,13 +260,11 @@ Add new paragraphs after 20.6.1/p1 [optional.general]
 <br/><tab/> template&lt;class T&gt;
 <br/><tab2/>class optional;
 <ins>
-<br/> }
 <br/>namespace pmr {
 <br/><tab/> // [pmroptional.optional], class template optional
 <br/><tab/> template&lt;class T&gt;
 <br/><tab2/>class optional;
 <br/> }
-<br/>namespace std {
 </ins>
 <br/> ...
 </tt>
@@ -617,7 +618,7 @@ Insert new sections after 20.6.3 Class template optional [optional.optional]
 <p><h3><ins> Header &lt;pmroptional&gt; synopsis [pmroptional.sys]</pmroptional></ins></h3>
 
 <blockquote><ins><code>
-namespace pmr {
+namespace std::pmr {	
 <br/><tab/>  // [pmroptional.optional]
 <br/><tab/>   template&lt;class T&gt;
 <br/><tab2/>     class optional;
@@ -732,7 +733,7 @@ namespace std::pmr {
 <br/><tab/> class optional <i> see below</i>{
 <br/><tab/> public:
 <br/><tab2/> using value_type = T;
-<br/><tab2/> using allocator_type = std::pmr::polymorphic_allocator&lt;&gt;; // <i>not always defined, see below</i>
+<br/><tab2/> using allocator_type = polymorphic_allocator&lt;&gt;; // <i>not always defined, see below</i>
 <br/>
 <br/><tab2/>    // [pmroptional.ctor], constructors
     <br/><tab2/>optional() noexcept;
@@ -815,9 +816,9 @@ namespace std::pmr {
  <br/><tab2/>   // [pmroptional.mod], modifiers
 <br/><tab2/>    void reset() noexcept;
 <br/>
-<br/><tab2/>  private:
-<br/><tab2/><tab/>    T* val;         // exposition only
-	<br/><tab2/><tab/>    const std::pmr::polymorphic_allocator&lt;&gt;  <i>M_alloc</i>;         // <i> exposition only; not always provided, see below</i>
+<br/><tab/>  private:
+<br/><tab2/>    T* val;         // exposition only
+<br/><tab2/>    const polymorphic_allocator&lt;&gt;  <i>M_alloc</i>;         // <i> exposition only; not always provided, see below</i>
 <br/><tab/>  };
 <br/>
 <br/><tab/>   template&lt;class T&gt;
@@ -849,8 +850,7 @@ std::optional&lt;T&gt;
 </ins></blockquote>
 <blockquote><ins>If and only if <tt>uses_allocator&lt;T, polymorphic_allocator&lt;&gt;&gt;</tt> is <tt>true</tt>, the following applies :
 <br/> - <tt>allocator_type</tt> will be defined,
-<br/> - exposition only member <tt><i>M_alloc</i></tt> will be provided and will point to the 
-memory_resource used when creating the contained value, and
+<br/> - exposition only member <tt><i>M_alloc</i></tt> will be provided and will be used to create the contained value, if any, and
 <br/> - if &lt;T&gt; provides <tt>get_allocator()</tt> member function whose return type is convertible to <tt>polymorphic_allocator&lt;&gt;</tt>, the implementation is 
 allowed to assume that the allocator used for constructing the element is the same allocator as returned 
 by <tt>T::get_allocator()</tt>. [<i>Note:</i> In such an implementation, <tt>pmr::optional&lt;pmr::string&gt;</tt> 
@@ -898,7 +898,7 @@ Initializes the contained value with <tt>std​::​forward&lt;Args&gt;(args)...
 
 <br/>
 <br/><code>template&lt;class... Args&gt; explicit optional(in_place_t, initializer_list&lt;U&gt; il, Args&amp;&amp;... args);</code>
-<br/><tab/><i>Effects:</i>  If <tt>uses_allocator&lt;T, polymorphic_allocator&lt;&gt;&gt;</tt> is <tt>true</tt>, <tt><i>M_alloc</i></tt> is initialized with <tt>std::pmr::get_default_resource()</tt>. 
+<br/><tab/><i>Effects:</i>  If <tt>uses_allocator&lt;T, polymorphic_allocator&lt;&gt;&gt;</tt> is <tt>true</tt>, <tt><i>M_alloc</i></tt> is default initialized</tt>. 
 Initializes the contained value with <tt>il and std​::​forward&lt;Args&gt;(args)....</tt>.
 <br/><tab/><i>Ensures:</i> <tt>*this</tt> contains a value..
 <br/><tab/><i>Throws:</i> Any exception thrown by the selected constructor of <tt>T</tt>.
@@ -1519,7 +1519,7 @@ Postcondition is that <tt>*this</tt> does not contain a value and <tt>rhs</tt> c
 <br/><tab2/><tt>return bool(*this) ? std::move(*val) : throw bad_optional_access();</tt>
 
 <br/>
-<br/><tt>template&lt;class U&gt; T value_or(U&amp;&amp;) const&amp;;</tt>
+<br/><tt>template&lt;class U&gt; T value_or(U&amp;&amp; v) const&amp;;</tt>
 <br/><tab/><i>Effects:</i> Equivalent to:
 <br/><tab2/><tt>return bool(*this) ? **this : static_cast&lt;T&gt;(std::forward&lt;U&gt;(v));</tt>
 <br/><tab/><i>Remarks:</i> If <tt>is_­copy_­constructible_­v&lt;T&gt;
@@ -1527,7 +1527,7 @@ Postcondition is that <tt>*this</tt> does not contain a value and <tt>rhs</tt> c
 the program is ill-formed.
 
 <br/>
-<br/><tt>template&lt;class U&gt; T value_or(U&amp;&amp;) &amp;&amp;;</tt>
+<br/><tt>template&lt;class U&gt; T value_or(U&amp;&amp; v) &amp;&amp;;</tt>
 <br/><tab/><i>Effects:</i> Equivalent to:
 <br/><tab2/><tt>return bool(*this) ? std::move(**this) : static_cast&lt;T&gt;(std::forward&lt;U&gt;(v));</tt>
 <br/><tab/><i>Remarks:</i> If <tt>is_­move_­constructible_­v&lt;T&gt;
@@ -1536,7 +1536,7 @@ the program is ill-formed.
 
 
 <br/>
-<br/><tt>    template&lt;class U&gt; T value_or(allocator_arg_t, const polymorphic_allocator&lt;&gt;&amp; a, U&amp;&amp;) const&amp;;</tt>tt>
+<br/><tt>    template&lt;class U&gt; T value_or(allocator_arg_t, const polymorphic_allocator&lt;&gt;&amp; a, U&amp;&amp; v) const&amp;;</tt>tt>
 <br/><tab/><i>Constraints:</i> <tt>uses_allocator&lt;T,polymorphic_allocator&lt;&gt;&gt;</tt> is true;
 <br/><tab/><i>Effects:</i> if <tt>*this</tt> contains a value, returns an object of type <tt>T</tt> initialized by
 uses-allocator construction with allocator <tt>a</tt> and <tt>**this</tt> as the constructor argument.
@@ -1547,7 +1547,7 @@ uses-allocator construction with allocator <tt>a</tt> and <tt>std::forward&lt;U&
 the program is ill-formed.
 
 <br/>
-<br/><tt>    template&lt;class U&gt; T value_or(allocator_arg_t, const polymorphic_allocator&lt;&gt;&amp;, U&amp;&amp;) &amp;&amp;;</tt>
+<br/><tt>    template&lt;class U&gt; T value_or(allocator_arg_t, const polymorphic_allocator&lt;&gt;&amp; a, U&amp;&amp; v) &amp;&amp;;</tt>
 <br/><tab/><i>Constraints:</i> <tt>uses_allocator&lt;T,polymorphic_allocator&lt;&gt;&gt;</tt> is true;
 <br/><tab/><i>Effects:</i> if <tt>*this</tt> contains a value, returns an object of type <tt>T</tt> initialized by
 uses-allocator construction with allocator <tt>a</tt> and <tt>std::move(**this)</tt> as the constructor argument.
