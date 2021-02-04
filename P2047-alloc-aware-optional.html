@@ -62,7 +62,7 @@ Audience: LEWG
   not replace the current <tt>std::optional</tt>, but would resolve to
   <tt>std::optional</tt> when the value type is not AA. By automatically
   handling the distinction between AA and non-AA value types,
-  <tt>pmr::optional</tt> can easily be used in generic code where it is not
+  <tt>std::pmr::optional</tt> can easily be used in generic code where it is not
   known in advance if it would be storing an AA type or not.
 </p>
 <p>  
@@ -79,9 +79,10 @@ do any allocation, and that the name is not appropriate
 <br/>- adjusted for LWG 2833
 <br/>- added discussion on deduction guides
 <br/>- removed mentions of using a type alias since the type alias approach has proven to be problematic
-<br/>- modified the specification of pmr::optional to cover both AA and non AA types
+<br/>- modified the specification of std::pmr::optional to cover both AA and non AA types
 <br/>- added CTAD specification
-<br/>- modified the specification of pmr::optional to be expressed in terms of <tt>pmr::polymorphic_allocator&lt;&gt;</tt>, as opposed to <tt>memory_resource</tt>
+<br/>- modified the specification of std::pmr::optional to be expressed in terms of 
+	<tt>std::pmr::polymorphic_allocator&lt;&gt;</tt>, as opposed to <tt>std::pmr::memory_resource</tt>
 gt;</p>
 
 
@@ -107,18 +108,18 @@ gt;</p>
   allocator by which it can initialize it's contained object. As a
   result, <tt>std::optional</tt> is not a good fit for situations where
   allocators are used.
-  A <tt>pmr::vector&lt;optional&lt;pmr::string&gt;&gt;</tt>, for example,
+  A <tt>std::pmr::vector&lt;optional&lt;std::pmr::string&gt;&gt;</tt>, for example,
   cannot ensure that all of strings within it use the same allocator,
   violating a key invariant of PMR containers. If one of the elements of the
   vector became disengaged and re-engaged, for example, the allocator for that
   one element could change.
 /p>
 <p>
-  The <tt>pmr::optional</tt> class template proposed here properly adheres to
+  The <tt>std::pmr::optional</tt> class template proposed here properly adheres to
   the rules of an AA type when instantiated with an AA value type. It holds a
   copy of the allocator used to construct it, even when disengaged, and uses
   that allocator to construct its element when re-engaged. Containers
-  of <tt>pmr::optional</tt> objects can correctly manage their memory.
+  of <tt>std::pmr::optional</tt> objects can correctly manage their memory.
 </p>
 
 <p>
@@ -127,17 +128,17 @@ gt;</p>
   each type the optional is engaged.  However, when holding a non-AA type,
   there is no reason to pay the overhead of storing an allocator, nor to
   support the AA constructor interface. For this
-  reason, <tt>pmr::optional</tt></p> has a different specialisation for AA and
+  reason, <tt>std::pmr::optional</tt></p> has a different specialisation for AA and
   non-AAtype. 
 
 <h2>Design decisions:</h2>
 <p>
   Rather than support the entire C++11-style set
-  allocators, <tt>pmr::optional</tt> works only
-  with <tt>pmr::polymorphic_allocator</tt>. The design keeps the allocator
+  allocators, <tt>std::pmr::optional</tt> works only
+  with <tt>std::pmr::polymorphic_allocator</tt>. The design keeps the allocator
   from infecting the optional's type, in the sense that it's not a template
   parameter. The modern PMR-style allocator model simplifies specification,
-  implementation, and use of <tt>pmr::optional</tt>.  Allocator-aware
+  implementation, and use of <tt>std::pmr::optional</tt>.  Allocator-aware
   optionals are interoperable even if they use different concrete allocators,
   because the concrete allocator doesn't change the type, nor does it change
   the size of the type.
@@ -153,38 +154,39 @@ gt;</p>
 <p>
   This was an implementation-based reason for having an allocator-aware
   type separate from the usual optional. All the complexity of conditional
-  triviality is in std::optional, and std::pmr::optional's allocator-aware
+  triviality is in <tt>std::optional</tt>, and <tt>std::pmr::optional</tt>'s allocator-aware
   alias target has none of that. </p>
   
 <p>
-  The first proposal suggested using a type alias where a non-AA pmr::optional
-  aliases std::optional, and AA pmr::optional aliases a new unnamed type. 
+	The first proposal suggested using a type alias where a non-AA <tt>std::pmr::optional</tt>
+	aliases <tt>std::optional</tt>, and AA <tt>std::pmr::optional</tt> aliases a new unnamed type. 
   However, this causes usability issues. Type deduction in cases like :
 <br/><tt>
 <br/>template &lt;typename T&gt;
-<br/>void foo(pmr::optional&lt;T&gt;);
+<br/>void foo(std::pmr::optional&lt;T&gt;);
 <br/></tt>
 
 <br/>did not work. The above was equivalent to 
 
 <br/><tt>
 <br/>template &lttypename T&gt
-<br/>void foo(conditional&lt;uses_allocator &lt;T, polymorphic_allocator&lt;&gt;&gt;::value ,
+<br/>void foo(std::conditional&lt;std::uses_allocator &lt;T, std::pmr::polymorphic_allocator&lt;&gt;&gt;::value ,
 <br/><tab2/><tab2/><tab2/><i>alloc_optional</i>&ltT&gt,
 <br/><tab2/><tab2/><tab2/>std::optional&lt;T&gt;&gt;:type);
 <br/></tt>
 <br/> 
-and using the nested <tt>type</tt> of the <tt>conditional</tt> as the function template parameter  made for an undeduced context.
+and using the nested <tt>type</tt> of the <tt>std::conditional</tt> as the function template parameter  made for an undeduced context.
 </p>
   
 
 <h2>Feedback items for LEWG: </h2>
 
 <p>
-	<h3>Should pmr::optional be placed in the <tt>&lt;optional&gt;</tt> header?</p>
+	<h3>Should <tt>std::pmr::optional</tt> be placed in the <tt>&lt;optional&gt;</tt> header?</p>
 </h3>
-<br/> This proposal puts pmr::optional in a new header.	Historically, pmr containers didn't have their own header files. However, 
-	<tt>std::pmr::optional</tt> is a more complex type than, for example, <tt>std::pmr::vector</tt>.
+	<br/> This proposal puts <tt>std::pmr::optional</tt> in a new header. Historically, pmr containers didn't have their own header files.
+	However, <tt>std::pmr::optional</tt> is a more complex type than, for example, <tt>std::pmr::vector</tt>.
+	<br/>
 <h3>Should the deduction guide for mixed optional unpack or not?</p>
 </h3>
 <p>
@@ -210,9 +212,9 @@ in the above example be ?
 <br/>The current proposal favours unpacking, and the types are <tt>std::pmr::optional&lt;value_type&gt;</tt>
 ,  <tt>std::pmr::optional&lt;value_type_aa&gt;</tt>,  <tt>std::optional&lt;value_type&gt;</tt>
 and  <tt>std::optional&lt;value_type_aa&gt;</tt>. This seems to fit with the idea that
-pmr::optional and std::optional are type who are close enough that they deserve to be
+	<tt>std::pmr::optional</tt> and <tt>std::optional</tt> are types that are close enough that they deserve to be
 treated equally wherever they can. However, it does mean that they are somehow blessed
-by the standard to work together in a way a user defined type which inherits from std::optional
+by the standard to work together in a way a user defined type which inherits from <tt>std::optional</tt>
 wouldn't be. 
 </p>
 
@@ -220,7 +222,7 @@ wouldn't be.
 <p><h3> Which allocator should be used in value_or ?</p></h3>
 <p>
   It is not all that obvious which allocator should be used for the
-  object returned by value_or. Should the decision be left to the type
+	object returned by <tt>value_or</t>>. Should the decision be left to the type
   or should it be mandated by the optional ? That is, should the object
   be constructed by plain copy/move construction or with uses-allocator 
   construction?
@@ -233,8 +235,8 @@ wouldn't be.
 <p>
   We might consider an “allocator aware” (AA) concept that requires
   a <tt>get_allocator()</tt>
-  method that returns something convertible to <tt>polymorphic_allocator&lt;&gt;</tt>.
-  If we used this concept instead of the <tt>uses_allocator</tt> trait, the allocator would require
+  method that returns something convertible to <tt>std::pmr::polymorphic_allocator&lt;&gt;</tt>.
+  If we used this concept instead of the <tt>std::uses_allocator</tt> trait, the allocator would require
   zero extra space in most (but not all) cases. (The exception would be a type that stores 
   its allocator outside of its footprint and whose footprint is smaller than 
   polymorphic_allocator<>.)
@@ -245,9 +247,10 @@ Add new paragraphs after 20.6.1/p1 [optional.general]
 </p>
 <p> <blockquote>
 <ins>
-[2] <tt>pmr::optional</tt> is a class template such that for a type <tt>T</tt>, where
-<tt>uses_allocator&lt;T, polymorphic_allocator&lt;&gt;&gt;</tt> is true, an optional object of type 
-<tt>pmr::optional&lt;T&gt;</tt> will construct the contained object, if any, with an allocator of type <tt>polymorphic_allocator&lt;&gt;</tt>. 
+[2] <tt>spmr::optional</tt> is a class template such that for a type <tt>T</tt>, where
+<tt>uses_allocator&lt;T, pmr::polymorphic_allocator&lt;&gt;&gt;</tt> is true, an optional object of type 
+<tt>spmr::optional&lt;T&gt;</tt> will construct the contained object, if any,
+	with an allocator of type <tt>pmr::polymorphic_allocator&lt;&gt;</tt>. 
 <br/>
 
 
@@ -715,13 +718,7 @@ namespace std::pmr {
  <br/><tab/> // [pmroptional.hash], hash support
 <br/><tab/>   template&lt;class T&gt; struct hash&lt;optional&lt;T&gt;&gt;;
 <br/>}
-<!-- 
-<br/> namespace std {
-<br/><tab/> template&lt;typename T&gt;
-<br/><tab2/>   struct uses_allocator&lt;optional&lt;T&gt;, pmr::polymorphic_allocator&lt;&gt;&gt; 
- <br/><tab2/><tab/> : public uses_allocator&lt;T, pmr::polymorphic_allocator&lt;&gt;&gt;::type { };
-<br/>}
--->
+
 </code></ins></blockquote></p>
 
 <p><h3><ins> Class template optional  [optional.pmroptional]</ins></h3></p>
