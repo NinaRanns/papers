@@ -626,6 +626,10 @@ namespace std::pmr {
 <br/><tab/>   template&lt;class T&gt;
 <br/><tab2/>     class optional;
 <br/>		  
+<br/><tab/>  // [pmroptional.traits], allocator-related traits
+<br/><tab/>    template&ltclass T&gt;
+<br/><tab2/>   struct uses_allocator&ltT, polymorphic_allocator&lt;&gt;&gt;;
+<br/>
  <br/><tab/>  // [pmroptional.relops], relational operators
 <br/><tab/>   template&lt;class T, class U&gt;
 <br/><tab2/>	bool operator==(const optional&lt;T&gt;&amp;, const optional&lt;U&gt;&amp;);
@@ -737,6 +741,8 @@ namespace std::pmr {
     <br/><tab2/>optional(nullopt_t) noexcept;
     <br/><tab2/>optional(const optional&amp;);
     <br/><tab2/>optional(optional&amp;&amp;) noexcept(<i>see below</i>);
+    <br/><tab2/>optional(const std::optional&amp;);
+    <br/><tab2/>optional(std::optional&amp;&amp;);	
     <br/><tab2/>template&lt;class... Args&gt;
       <br/><tab2/><tab/>explicit optional(in_place_t, Args&amp;&amp;...);
     <br/><tab2/>template&lt;class U, class... Args&gt;
@@ -757,6 +763,8 @@ namespace std::pmr {
     <br/><tab2/>optional(allocator_arg_t, const polymorphic_allocator&lt;&gt;&amp;, nullopt_t) noexcept; // <i>not always provided, see below</i>
     <br/><tab2/>optional(allocator_arg_t, const polymorphic_allocator&lt;&gt;&amp;, const optional&amp;); // <i>not always provided, see below</i>
     <br/><tab2/>optional(allocator_arg_t, const polymorphic_allocator&lt;&gt;&amp;, optional&amp;&amp;) noexcept(<i>see below</i>); // <i>not always provided, see below</i>
+    <br/><tab2/>optional(allocator_arg_t, const polymorphic_allocator&lt;&gt;&amp;, const std::optional&amp;); // <i>not always provided, see below</i>
+    <br/><tab2/>optional(allocator_arg_t, const polymorphic_allocator&lt;&gt;&amp;, std::optional&amp;&amp;); // <i>not always provided, see below</i>
     <br/><tab2/>template&lt;class... Args&gt;
       <br/><tab2/><tab/>explicit optional(allocator_arg_t, const polymorphic_allocator&lt;&gt;&amp;, in_place_t,  Args&amp;&amp;...); // <i>not always provided, see below</i>
     <br/><tab2/>template&lt;class U, class... Args&gt;
@@ -872,7 +880,7 @@ If <tt>rhs</tt> contains a value, initializes the contained value
 with the expression <tt>*rhs</tt>.
 <br/><tab/><i>Ensures:</i> <tt>bool(rhs) == bool(*this)</tt>.
 <br/><tab/><i>Throws:</i> Any exception thrown by the selected constructor of <tt>T</tt>.
-<br/><tab/><i>Remarks:</i> This constructor shall be defined as deleted unless <tt>is_­copy_­constructible_­v&lt;T&gt;</tt> is true.
+<br/><tab/><i>Mandates:</i><tt>is_­copy­constructible_­v&lt;T&gt;</tt> is true.
 
 <br/>
 <br/><code>optional(optional&amp;&amp; rhs) noexcept(<i>see below</i>)</code>
@@ -882,6 +890,23 @@ with the expression <tt>std​::​move(*rhs)</tt>. <tt>bool(rhs)</tt> is unchan
 <br/><tab/><i>Ensures:</i> <tt>bool(rhs) == bool(*this)</tt>.
 <br/><tab/><i>Throws:</i> Any exception thrown by the selected constructor of <tt>T</tt>.
 <br/><tab/><i>Remarks:</i> The expression inside <tt>noexcept</tt> is equivalent to <tt>is_­nothrow_­move_­constructible_­v&lt;T&gt;</tt>.
+<br/><tab/><i>Mandates:</i><tt>is_­move_­constructible_­v&lt;T&gt;</tt> is true.
+<br/>
+<br/><code>optional(const std::optional&amp;);</code>
+<br/><tab/><i>Effects:</i> If <tt>uses_allocator&lt;T, polymorphic_allocator&lt;&gt;&gt;</tt> is <tt>true</tt>, <tt><i>M_alloc</i></tt> is default initialized</tt>. 
+If <tt>rhs</tt> contains a value, initializes the contained value 
+with the expression <tt>*rhs</tt>.
+<br/><tab/><i>Ensures:</i> <tt>bool(rhs) == bool(*this)</tt>.
+<br/><tab/><i>Throws:</i> Any exception thrown by the selected constructor of <tt>T</tt>.
+<br/><tab/><i>Mandates:</i><tt>is_­copy­constructible_­v&lt;T&gt;</tt> is true.
+
+<br/>
+<br/><code>optional(std::optional&amp;&amp; rhs)</code>
+<br/><tab/><i>Effects:</i> If <tt>uses_allocator&lt;T, polymorphic_allocator&lt;&gt;&gt;</tt> is <tt>true</tt>, <tt><i>M_alloc</i></tt> is initialized with <tt>rhs.<i>M_alloc</i></tt>. 
+If <tt>rhs</tt> contains a value, initializes the contained value
+with the expression <tt>std​::​move(*rhs)</tt>. <tt>bool(rhs)</tt> is unchanged.
+<br/><tab/><i>Ensures:</i> <tt>bool(rhs) == bool(*this)</tt>.
+<br/><tab/><i>Throws:</i> Any exception thrown by the selected constructor of <tt>T</tt>.
 <br/><tab/><i>Mandates:</i><tt>is_­move_­constructible_­v&lt;T&gt;</tt> is true.
 
 
@@ -1037,6 +1062,9 @@ If <tt>rhs</tt> contains a value, initializes the contained value with <tt>std�
   <br/>optional(allocator_arg_t, const polymorphic_allocator&lt;&gt;&amp;, nullopt_t) noexcept;
     <br/>optional(allocator_arg_t, const polymorphic_allocator&lt;&gt;&amp;, const optional&amp;);
     <br/>optional(allocator_arg_t, const polymorphic_allocator&lt;&gt;&amp;, optional&amp;&amp;) noexcept(<i>see below</i>);
+	
+    <br/>optional(allocator_arg_t, const polymorphic_allocator&lt;&gt;&amp;, const std::optional&amp;);
+    <br/>optional(allocator_arg_t, const polymorphic_allocator&lt;&gt;&amp;, std::optional&amp;&amp;);
     <br/>template&lt;class... Args&gt;
       <br/><tab/>explicit optional(allocator_arg_t, const polymorphic_allocator&lt;&gt;&amp;, in_place_t, Args&amp;&amp;...);
     <br/>template&lt;class U, class... Args&gt;
@@ -1571,6 +1599,12 @@ the program is ill-formed.
 <br/><tab/><i>Effects:</i> If <tt>*this</tt> contains a value, calls <tt>val->T​::​~T()</tt> to destroy the contained value; otherwise no effect.
 <br/><tab/><i>Ensures:</i> <tt>*this</tt> does not contain a value.
 
+</ins></blockquote>
+<p><h4><ins> Allocator-related traits [pmroptional.traits]</ins></h4></p>
+<blockquote><ins>
+<br/><tt>    template&ltclass T&gt;</tt>
+<br/><tt>   struct uses_allocator&ltT, polymorphic_allocator&lt;&gt;&gt; : 
+<br/><tab/><tt>   uses_allocator&ltT,  polymorphic_allocator&lt;&gt;&gt; { };</tt>
 
 </ins></blockquote>
 
