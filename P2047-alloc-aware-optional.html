@@ -24,7 +24,7 @@
 <body>
 
 <address align=right>
-Document number: P2047R0
+Document number: P2047R1
 <br/>
 Audience: LEWG
 <br/>
@@ -32,21 +32,13 @@ Audience: LEWG
 <a href="mailto:ville.voutilainen@gmail.com">Ville Voutilainen</a><br/>
 <a href="mailto:dinka.ranns@gmail.com">Nina Dinka Ranns</a><br/>
 <a href="mailto:phalpern@halpernwightsoftware.com">Pablo Halpern</a><br/>
-2020-01-12<br/>
+2021-02-17<br/>
 </address>
 <hr/>
 <h1 align=center>An allocator-aware optional type</h1>
 
 <h2>Abstract</h2>
-
-
-<!--
-<h2>change history :</h2>
-<p> - modified alloc-optional(const alloc-optional&) to use default resource </p>
-<p> - added allocator extended value_or</p>
-<p> - swapped around in_place_t and allocator_arg_t positions in allocator extended in_place_t constructors </p>
-<p> - extended feedback section </p>
- -->
+ 
 <p>
   Library types that can potentially hold <em>allocator-aware (AA)</em>
   objects should, themselves, be allocator-aware. A PMR container, for example,
@@ -57,14 +49,12 @@ Audience: LEWG
   but effectively follows the rules through special handling
   in <em>uses-allocator construction</em>.)
 </p>
-
 <p>
   The current definition of <tt>std::optional</tt> does not follow the rules
   for an AA type, even when holding an AA value. This limitation
-  makes <tt>optional</tt> unsuitable for storage in an AA container when
+  makes <tt>std::optional</tt> unsuitable for storage in an AA container when
   memory allocation customization is needed.
 </p>
-
 <p>
   In this paper, we propose a new, allocator-aware
   <tt>std::pmr::optional</tt> usable as a container element type and in any
@@ -72,14 +62,29 @@ Audience: LEWG
   not replace the current <tt>std::optional</tt>, but would resolve to
   <tt>std::optional</tt> when the value type is not AA. By automatically
   handling the distinction between AA and non-AA value types,
-  <tt>pmr::optional</tt> can easily be used in generic code where it is not
+  <tt>std::pmr::optional</tt> can easily be used in generic code where it is not
   known in advance if it would be storing an AA type or not.
 </p>
-
-<p>
+<p>  
   This is a complete proposal with formal wording.
   It has not yet been discussed in LEWGI or LEWG.
 </p>
+
+<p>
+<br/>change history :
+<br/>- replaced <tt>alloc_optional</tt> with additional overloads of <tt>make_optional</tt> that
+take an <tt>allocator_arg_t</tt> : it was observed that <tt>alloc_optional</tt> doesn't actually
+do any allocation, and that the name is not appropriate
+<br/>- fixed the order of arguments in the <i>Returns</i> clause of what used to be <tt>alloc_optional</tt>
+<br/>- adjusted for LWG 2833
+<br/>- added discussion on deduction guides
+<br/>- removed mentions of using a type alias since the type alias approach has proven to be problematic
+<br/>- modified the specification of std::pmr::optional to cover both AA and non AA types
+<br/>- added CTAD specification
+<br/>- modified the specification of <tt>std::pmr::optional</tt> to be expressed in terms of 
+	<tt>std::pmr::polymorphic_allocator&lt;&gt;</tt>, as opposed to <tt>std::pmr::memory_resource</tt>
+gt;</p>
+
 
 <h2>Motivation and Proposal Summary</h2>
 <p>
@@ -103,19 +108,18 @@ Audience: LEWG
   allocator by which it can initialize it's contained object. As a
   result, <tt>std::optional</tt> is not a good fit for situations where
   allocators are used.
-  A <tt>pmr::vector&lt;optional&lt;pmr::string&gt;&gt;</tt>, for example,
+  A <tt>std::pmr::vector&lt;optional&lt;std::pmr::string&gt;&gt;</tt>, for example,
   cannot ensure that all of strings within it use the same allocator,
   violating a key invariant of PMR containers. If one of the elements of the
   vector became disengaged and re-engaged, for example, the allocator for that
   one element could change.
-</p>
-
+/p>
 <p>
-  The <tt>pmr::optional</tt> class template proposed here properly adheres to
+  The <tt>std::pmr::optional</tt> class template proposed here properly adheres to
   the rules of an AA type when instantiated with an AA value type. It holds a
   copy of the allocator used to construct it, even when disengaged, and uses
   that allocator to construct its element when re-engaged. Containers
-  of <tt>pmr::optional</tt> objects can correctly manage their memory.
+  of <tt>std::pmr::optional</tt> objects can correctly manage their memory.
 </p>
 
 <p>
@@ -124,43 +128,20 @@ Audience: LEWG
   each type the optional is engaged.  However, when holding a non-AA type,
   there is no reason to pay the overhead of storing an allocator, nor to
   support the AA constructor interface. For this
-  reason, <tt>pmr::optional</tt> is not a class template, but an alias
-  template that resolves to an AA optional class when instantiated with an AA
-  value type and to <tt>std::optional</tt> otherwise. This approach maximizes
-  interoperability with existing <tt>optional</tt> while allowing programmers
-  to use <tt>pmr::optional</tt> ubiquitously, even in generic code, without
-  regard to whether or not the value type is AA. For example:
-</p>
-
-<blockquote>
-  <tt>std::pmr::optional&lt;int&gt; x; // Same as std::optional</tt></br>
-  <tt>std::pmr::optional&lt;pmr::string&gt; y; // New, AA optional</tt>
-</blockquote>
+  reason, <tt>std::pmr::optional</tt></p> has a different specialisation for AA and
+  non-AAtype. 
 
 <h2>Design decisions:</h2>
 <p>
   Rather than support the entire C++11-style set
-  allocators, <tt>pmr::optional</tt> works only
-  with <tt>pmr::polymorphic_allocator</tt>. The design keeps the allocator
+  allocators, <tt>std::pmr::optional</tt> works only
+  with <tt>std::pmr::polymorphic_allocator</tt>. The design keeps the allocator
   from infecting the optional's type, in the sense that it's not a template
   parameter. The modern PMR-style allocator model simplifies specification,
-  implementation, and use of <tt>pmr::optional</tt>.  Allocator-aware
+  implementation, and use of <tt>std::pmr::optional</tt>.  Allocator-aware
   optionals are interoperable even if they use different concrete allocators,
   because the concrete allocator doesn't change the type, nor does it change
   the size of the type.
-</p>
-
-<p>
-  We want std::pmr::optional to work for both allocator aware and non allocator aware type.
-  However, such type
-  doesn't need the allocator extended interface for non allocator aware types.
-  In fact, the interface and functionality of
-  std::optional is sufficient for non allocator aware types.
-  We propose std::pmr::optional being an alias template; if the element
-  of the optional is not allocator-aware, the alias template aliases
-  std::optional. Otherwise, it aliases an unspecified type that
-  adds allocator parameters to optional's constructor overload set and which remembers the
-  allocator when disengaged.
 </p>
 
 <p>
@@ -173,107 +154,159 @@ Audience: LEWG
 <p>
   This was an implementation-based reason for having an allocator-aware
   type separate from the usual optional. All the complexity of conditional
-  triviality is in std::optional, and std::pmr::optional's allocator-aware
+  triviality is in <tt>std::optional</tt>, and <tt>std::pmr::optional</tt>'s allocator-aware
   alias target has none of that. </p>
+  
+<p>
+	The first proposal suggested using a type alias where a non-AA <tt>std::pmr::optional</tt>
+	aliases <tt>std::optional</tt>, and AA <tt>std::pmr::optional</tt> aliases a new unnamed type. 
+  However, this causes usability issues. Type deduction in cases like :
+<br/><tt>
+<br/>template &lt;typename T&gt;
+<br/>void foo(std::pmr::optional&lt;T&gt;);
+<br/></tt>
 
-<h2>Feedback solicited from LEWG: </h2>
+<br/>did not work. The above was equivalent to 
+
+<br/><tt>
+<br/>template &lttypename T&gt
+<br/>void foo(std::conditional&lt;std::uses_allocator &lt;T, std::pmr::polymorphic_allocator&lt;&gt;&gt;::value ,
+<br/><tab2/><tab2/><tab2/><i>alloc_optional</i>&ltT&gt,
+<br/><tab2/><tab2/><tab2/>std::optional&lt;T&gt;&gt;:type);
+<br/></tt>
+<br/> 
+and using the nested <tt>type</tt> of the <tt>std::conditional</tt> as the function template parameter  made for an undeduced context.
+</p>
+  
+
+<h2>Feedback items for LEWG: </h2>
 
 <p>
-<h3>Should the general alias and the concrete allocator-aware optional type both be exposed?</p>
+	<h3>Should <tt>std::pmr::optional</tt> be placed in the <tt>&lt;optional&gt;</tt> header?</p>
+</h3>
+	<br/> This proposal puts <tt>std::pmr::optional</tt> in a new header. Historically, pmr containers didn't have their own header files.
+	However, <tt>std::pmr::optional</tt> is a more complex type than, for example, <tt>std::pmr::vector</tt>.
+	<br/>
+<h3>Should the deduction guide for mixed optional unpack or not?</p>
 </h3>
 <p>
-  This proposal doesn't expose the concrete allocator-aware optional
-  type. std::pmr::optional aliases it, and we specify it, but we don't
-  name it. Chances are that some users might want to use it as a named
-  type, in order to reason about their code. Furthermore, it's somewhat
-  questionable whether std::pmr::optional&lt;AllocAware&gt; and
-  std::pmr::optional&lt;AllocUnaware&gt; should even share a name; the APIs
-  are different, the semantics are different.
+Consider
+<tt>
+<br/>
+<br/>  std::optional x1 = value_type();
+<br/>  std::pmr::optional copy1 = x1; // #1
+<br/>
+<br/>  std::optional x2 = value_type_aa();
+<br/>  std::pmr::optional copy2 = x2; // #2
+<br/>
+<br/>  std::pmr::optional x3 = value_type();
+<br/>  std::optional copy3 = x3; // #3
+<br/>
+<br/>  std::pmr::optional x4 = value_type_aa();
+<br/>  std::optional copy4 = x4; // #4
+</tt>
+<br/>
+<br/>What should the types of <tt>x1</tt>, <tt>x2</tt>, <tt>x3</tt>, and <tt>x4</tt>
+in the above example be ? 
+<br/>
+<br/>The current proposal favours unpacking, and the types are <tt>std::pmr::optional&lt;value_type&gt;</tt>
+,  <tt>std::pmr::optional&lt;value_type_aa&gt;</tt>,  <tt>std::optional&lt;value_type&gt;</tt>
+and  <tt>std::optional&lt;value_type_aa&gt;</tt>. This seems to fit with the idea that
+	<tt>std::pmr::optional</tt> and <tt>std::optional</tt> are types that are close enough that they deserve to be
+treated equally wherever they can. However, it does mean that they are somehow blessed
+by the standard to work together in a way a user defined type which inherits from <tt>std::optional</tt>
+wouldn't be. 
 </p>
-<h3>Rationale for a separate type</h3>
-<p>
-  The reason why we chose to do it the current proposed  way is that
-  practical users   just want one vocabulary type that either does or
-  doesn't do allocators, depending on the element type's properties.
-  The users we've talked to didn't see much value in having a type
-  that is always allocator-aware; instead, it's allocator-aware when
-  it can be, and otherwise not.
-</p>
+
 
 <p><h3> Which allocator should be used in value_or ?</p></h3>
 <p>
   It is not all that obvious which allocator should be used for the
-  object returned by value_or. Should the decision be left to the type
+	object returned by <tt>value_or</t>>. Should the decision be left to the type
   or should it be mandated by the optional ? That is, should the object
-  be constructed by plain copy/move construction or with uses-allocator
+  be constructed by plain copy/move construction or with uses-allocator 
   construction?
-
+  
 </p>
 <p><h3> Should assignments use <t>is_­constructible</t> trait ? </h3> </p>
 <p>It's not construct from U we need, it's construct from U using the allocator. Do we need a new trait ?</p>
 
 <p><h3>Do we need an “allocator_aware” concept?</h3></p>
 <p>
-We might consider an “allocator aware” (AA) concept that requires
-a <tt>get_allocator()</tt>
-method that returns something convertible to <tt>polymorphic_allocator&lt;&gt;</tt>.
-If we used this concept instead of the <tt>uses_allocator</tt> trait, the allocator would require
-zero extra space in most (but not all) cases. (The exception would be a type that stores its allocator outside of its footprint and whose footprint is smaller than <tt>polymorphic_allocator&lt;&gt;</tt>.)</h3></hr></p>
+  We might consider an “allocator aware” (AA) concept that requires
+  a <tt>get_allocator()</tt>
+  method that returns something convertible to <tt>std::pmr::polymorphic_allocator&lt;&gt;</tt>.
+  If we used this concept instead of the <tt>std::uses_allocator</tt> trait, the allocator would require
+  zero extra space in most (but not all) cases. (The exception would be a type that stores 
+  its allocator outside of its footprint and whose footprint is smaller than 
+  polymorphic_allocator<>.)
+</p>
 <h2>Proposed wording</h2>
 <p>
 Add new paragraphs after 20.6.1/p1 [optional.general]
 </p>
 <p> <blockquote>
 <ins>
-[2] <tt>pmr::optional</tt> is an alias template such that for a type <tt>T</tt>, where
-<tt>uses_allocator&lt;T, polymorphic_allocator&lt;&gt;&gt;</tt> is true, <tt>pmr::optional&lt;T&gt;</tt>
-denotes a type which will construct the contained object with an allocator of type <tt>polymorphic_allocator&lt;&gt;</tt>.
-Otherwise, the alias template denotes <tt>std::optional</tt>. </ins></p></blockquote>
+[2] <tt>spmr::optional</tt> is a class template such that for a type <tt>T</tt>, where
+<tt>uses_allocator&lt;T, pmr::polymorphic_allocator&lt;&gt;&gt;</tt> is true, an optional object of type 
+<tt>spmr::optional&lt;T&gt;</tt> will construct the contained object, if any,
+	with an allocator of type <tt>pmr::polymorphic_allocator&lt;&gt;</tt>. 
 <br/>
 
 
 <p>Modify 20.6.2 Header <optional> synopsisl [optional.syn] </p>
 <p>
 <blockquote>
+<tt>
 <br/>namespace std {
 <br/><tab/> // [optional.optional], class template optional
-<br/><tab/> template&lt;classT&gt;
+<br/><tab/> template&lt;class T&gt;
 <br/><tab2/>class optional;
 <ins>
-<br/> }
 <br/>namespace pmr {
-<br/><tab/> // [alloc-optional.pmroptional], class template <i>alloc-optional</i>
-<br/><tab/> template&lt;classT&gt;
-<br/><tab2/>class <i>alloc-optional</i>;
-<br/><tab></tab>	template&lt;typename T&gt;
-<br/><tab2></tab2> 	using optional = conditional_t&lt;uses_allocator&lt;T, polymorphic_allocator&lt;&gt;&gt;::value,
-<br/><tab2/><tab2/><i>alloc-optional</i>&lt;T&gt; , std::optional&lt;T&gt;&gt;;
+<br/><tab/> // [pmroptional.optional], class template optional
+<br/><tab/> template&lt;class T&gt;
+<br/><tab2/>class optional;
 <br/> }
-<br/>namespace std {
 </ins>
 <br/> ...
+</tt>
 </blockquote>
 
 
 <p>Modify 20.6.3 Class template optional [optional.optional] </p>
 <p>
 <blockquote>
-// [optional.ctor], constructors
-...
-<ins>
+<br/>// [optional.ctor], constructors
+<br/>...
+<ins><tt>
 <br/><tab/> template&lt;class U&gt;
-<br/><tab2/>      explicit(see below) optional(const pmr::<i>alloc-optional</i>&lt;U&gt;&amp;);
+<br/><tab2/>      explicit(<i>see below</i>) optional(const pmr::optional&lt;U&gt;&amp;);
 <br/><tab/> template&lt;class U&gt;
-<br/><tab2/>      explicit(see below) optional(pmr::<i>alloc-optional</i>&lt;U&gt;&amp;&amp;);
+<br/><tab2/>      explicit(<i>see below</i>) optional(pmr::optional&lt;U&gt;&amp;&amp;);
+</tt>
 </ins>
-...
-// [optional.assign], assignment
-...
+<br/>...
+<br/>// [optional.assign], assignment
+<br/>...
 <ins>
-<br/><tab/>   template&lt;class U&gt; optional&amp; operator=(const <i>alloc-optional</i>&amp;);
-<br/><tab/>   template&lt;class U&gt; optional&amp; operator=(<i>alloc-optional</i>&amp;&amp;) noexcept(see below);
+<tt>
+<br/><tab/>   template&lt;class U&gt; optional&amp; operator=(const pmr::optional&amp;);
+<br/><tab/>   template&lt;class U&gt; optional&amp; operator=(pmr::optional&amp;&amp;) noexcept(<i>see below</i>);
+</tt>
 </ins>
+<tt>
+<br/>...
+<br/><tab/>   template&lt;class T&gt;
+<br/><tab/>   optional(T) -&gt; optional&lt;T&gt;;
+<ins>
+<br/><tab/>   template&lt;class T&gt;
+<br/><tab/>   optional(const pmr::optional&lt;T&gt;&amp;) -&gt; optional&lt;T&gt;;
+<br/><tab/>   template&lt;class T&gt;
+<br/><tab/>   optional(pmr::optional&lt;T&gt;&amp;&amp;) -&gt; optional&lt;T&gt;;
 
+</ins>
+</tt>
 </blockquote>
 </p>
 
@@ -281,84 +314,84 @@ Otherwise, the alias template denotes <tt>std::optional</tt>. </ins></p></blockq
 <p>
 <blockquote>
 <p>
-<br/><code>template&lt;class U&gt; explicit(see below) optional(const optional&lt;U&gt;&amp; v);</code>
+<br/><code>template&lt;class U&gt; explicit(<i>see below</i>) optional(const optional&lt;U&gt;&amp; v);</code>
 ...
 <br/><tab/><i>Mandates:</i> 
 <br/><tab2/> - <tt>is_­constructible_­v&lt;T, optional&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>,
-<br/><tab2/><ins> - <tt>is_­constructible_­v&lt;T, <i>alloc-optional</i>&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>, </ins>
+<br/><tab2/><ins> - <tt>is_­constructible_­v&lt;T, pmr::optional&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>, </ins>
 <br/><tab2/> - <tt>is_­constructible_­v&lt;T, optional&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>,
-<br/><tab2/><ins> - <tt>is_­constructible_­v&lt;T, <i>alloc-optional</i>&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>, </ins>
+<br/><tab2/><ins> - <tt>is_­constructible_­v&lt;T, pmr::optional&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>, </ins>
 <br/><tab2/> - <tt>is_­constructible_­v&lt;T, const optional&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>,
-<br/><tab2/><ins> - <tt>is_­constructible_­v&lt;T, const <i>alloc-optional</i>&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>, </ins>
+<br/><tab2/><ins> - <tt>is_­constructible_­v&lt;T, const pmr::optional&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>, </ins>
 <br/><tab2/> - <tt>is_­constructible_­v&lt;T, const optional&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>,
-<br/><tab2/><ins> - <tt>is_­constructible_­v&lt;T, const <i>alloc-optional</i>&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>, </ins>
+<br/><tab2/><ins> - <tt>is_­constructible_­v&lt;T, const pmr::optional&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>, </ins>
 <br/><tab2/> - <tt>is_­convertible_­v&lt;optional&lt;U&gt;&amp;, T&gt;</tt> is <tt>false</tt>,
-<br/><tab2/><ins> - <tt>is_­convertible_­v&lt;<i>alloc-optional</i>&lt;U&gt;&amp;, T&gt;</tt> is <tt>false</tt>, </ins>
+<br/><tab2/><ins> - <tt>is_­convertible_­v&lt;pmr::optional&lt;U&gt;&amp;, T&gt;</tt> is <tt>false</tt>, </ins>
 <br/><tab2/> - <tt>is_­convertible_­v&lt;optional&lt;U&gt;&amp;&amp;, T&gt;</tt> is <tt>false</tt>,
-<br/><tab2/><ins> - <tt>is_­convertible_­v&lt;<i>alloc-optional</i>&lt;U&gt;&amp;&amp;, T&gt;</tt> is <tt>false</tt>, </ins>
+<br/><tab2/><ins> - <tt>is_­convertible_­v&lt;pmr::optional&lt;U&gt;&amp;&amp;, T&gt;</tt> is <tt>false</tt>, </ins>
 <br/><tab2/> - <tt>is_­convertible_­v&lt;const optional&lt;U&gt;&amp;, T&gt;</tt> is <tt>false</tt>, <del>and</del>
-<br/><tab2/><ins> - <tt>is_­convertible_­v&lt;const <i>alloc-optional</i>&lt;U&gt;&amp;, T&gt;</tt> is <tt>false</tt>, </ins>
+<br/><tab2/><ins> - <tt>is_­convertible_­v&lt;const pmr::optional&lt;U&gt;&amp;, T&gt;</tt> is <tt>false</tt>, </ins>
 <br/><tab2/> - <tt>is_­convertible_­v&lt;const optional&lt;U&gt;&amp;&amp;, T&gt;</tt> is <tt>false</tt>,<ins>and</ins>
-<br/><tab2/><ins> - <tt>is_­convertible_­v&lt;const <i>alloc-optional</i>&lt;U&gt;&amp;&amp;, T&gt;</tt> is <tt>false</tt> </ins>
+<br/><tab2/><ins> - <tt>is_­convertible_­v&lt;const pmr::optional&lt;U&gt;&amp;&amp;, T&gt;</tt> is <tt>false</tt> </ins>
 ...
 </p>
 <p>
-<br/><code>template&lt;class U&gt; explicit(see below) optional(optional&lt;U&gt;&amp;&amp; v);</code>
+<br/><code>template&lt;class U&gt; explicit(<i>see below</i>) optional(optional&lt;U&gt;&amp;&amp; v);</code>
 ...
 <br/><tab/><i>Mandates:</i> 
 <br/><tab2/> - <tt>is_­constructible_­v&lt;T, optional&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>,
-<br/><tab2/><ins> - <tt>is_­constructible_­v&lt;T, <i>alloc-optional</i>&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>, </ins>
+<br/><tab2/><ins> - <tt>is_­constructible_­v&lt;T, pmr::optional&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>, </ins>
 <br/><tab2/> - <tt>is_­constructible_­v&lt;T, optional&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>,
-<br/><tab2/><ins> - <tt>is_­constructible_­v&lt;T, <i>alloc-optional</i>&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>, </ins>
+<br/><tab2/><ins> - <tt>is_­constructible_­v&lt;T, pmr::optional&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>, </ins>
 <br/><tab2/> - <tt>is_­constructible_­v&lt;T, const optional&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>,
-<br/><tab2/><ins> - <tt>is_­constructible_­v&lt;T, const <i>alloc-optional</i>&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>, </ins>
+<br/><tab2/><ins> - <tt>is_­constructible_­v&lt;T, const pmr::optional&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>, </ins>
 <br/><tab2/> - <tt>is_­constructible_­v&lt;T, const optional&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>,
-<br/><tab2/><ins> - <tt>is_­constructible_­v&lt;T, const <i>alloc-optional</i>&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>, </ins>
+<br/><tab2/><ins> - <tt>is_­constructible_­v&lt;T, const pmr::optional&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>, </ins>
 <br/><tab2/> - <tt>is_­convertible_­v&lt;optional&lt;U&gt;&amp;, T&gt;</tt> is <tt>false</tt>,
-<br/><tab2/><ins> - <tt>is_­convertible_­v&lt;<i>alloc-optional</i>&lt;U&gt;&amp;, T&gt;</tt> is <tt>false</tt>, </ins>
+<br/><tab2/><ins> - <tt>is_­convertible_­v&lt;pmr::optional&lt;U&gt;&amp;, T&gt;</tt> is <tt>false</tt>, </ins>
 <br/><tab2/> - <tt>is_­convertible_­v&lt;optional&lt;U&gt;&amp;&amp;, T&gt;</tt> is <tt>false</tt>,
-<br/><tab2/><ins> - <tt>is_­convertible_­v&lt;<i>alloc-optional</i>&lt;U&gt;&amp;&amp;, T&gt;</tt> is <tt>false</tt>, </ins>
+<br/><tab2/><ins> - <tt>is_­convertible_­v&lt;pmr::optional&lt;U&gt;&amp;&amp;, T&gt;</tt> is <tt>false</tt>, </ins>
 <br/><tab2/> - <tt>is_­convertible_­v&lt;const optional&lt;U&gt;&amp;, T&gt;</tt> is <tt>false</tt>, <del>and</del>
-<br/><tab2/><ins> - <tt>is_­convertible_­v&lt;const <i>alloc-optional</i>&lt;U&gt;&amp;, T&gt;</tt> is <tt>false</tt>, </ins>
+<br/><tab2/><ins> - <tt>is_­convertible_­v&lt;const pmr::optional&lt;U&gt;&amp;, T&gt;</tt> is <tt>false</tt>, </ins>
 <br/><tab2/> - <tt>is_­convertible_­v&lt;const optional&lt;U&gt;&amp;&amp;, T&gt;</tt> is <tt>false</tt>, <ins>and</ins>
-<br/><tab2/><ins> - <tt>is_­convertible_­v&lt;const <i>alloc-optional</i>&lt;U&gt;&amp;&amp;, T&gt;</tt> is <tt>false</tt> </ins>
+<br/><tab2/><ins> - <tt>is_­convertible_­v&lt;const pmr::optional&lt;U&gt;&amp;&amp;, T&gt;</tt> is <tt>false</tt> </ins>
 ...
 </p>
 ...
 <p>
 <ins>
 <br/>
-<br/><code>template&lt;class U&gt; explicit(see below) optional(const <i>alloc-optional</i>&lt;U&gt;&amp; rhs);</code>
-<br/><tab/><i>Effects:</i> If <tt>rhs</tt> contains a value, initializes the contained value
+<br/><code>template&lt;class U&gt; explicit(<i>see below</i>) optional(const pmr::optional&lt;U&gt;&amp; rhs);</code>
+<br/><tab/><i>Effects:</i> If <tt>rhs</tt> contains a value, initializes the contained value 
  as if direct-non-list-initializing an object of type <tt>T</tt> with the expression <tt>*rhs</tt>.
 <br/><tab/><i>Ensures:</i> <tt>bool(rhs) == bool(*this)</tt>.
 <br/><tab/><i>Throws:</i> Any exception thrown by the selected constructor of <tt>T</tt>.
+<br/><tab/><i>Remarks:</i> <br/><tab/>The expression inside <tt>explicit</tt> is equivalent to:
+<br/><tab2/><tt>!is_convertible_v&lt;const U&amp;, T&gt;</tt>
 <br/><tab/><i>Mandates:</i>
 <br/><tab2/> - <tt>is_­constructible_­v&lt;T, const U&amp;&gt;</tt> is <tt>true</tt>,
 <br/><tab2/> - <tt>is_same&lt;T,U&gt;</tt> is <tt>false</tt>,
 <br/><tab2/> - <tt>is_­constructible_­v&lt;T, optional&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>,
-<br/><tab2/> - <tt>is_­constructible_­v&lt;T, <i>alloc-optional</i>&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>,
+<br/><tab2/> - <tt>is_­constructible_­v&lt;T, pmr::optional&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>,
 <br/><tab2/> - <tt>is_­constructible_­v&lt;T, optional&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>,
-<br/><tab2/> - <tt>is_­constructible_­v&lt;T, <i>alloc-optional</i>&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>,
+<br/><tab2/> - <tt>is_­constructible_­v&lt;T, pmr::optional&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>,
 <br/><tab2/> - <tt>is_­constructible_­v&lt;T, const optional&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>,
-<br/><tab2/> - <tt>is_­constructible_­v&lt;T, const <i>alloc-optional</i>&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>,
+<br/><tab2/> - <tt>is_­constructible_­v&lt;T, const pmr::optional&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>,
 <br/><tab2/> - <tt>is_­constructible_­v&lt;T, const optional&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>,
-<br/><tab2/> - <tt>is_­constructible_­v&lt;T, const <i>alloc-optional</i>&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>,
+<br/><tab2/> - <tt>is_­constructible_­v&lt;T, const pmr::optional&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>,
 <br/><tab2/> - <tt>is_­convertible_­v&lt;optional&lt;U&gt;&amp;, T&gt;</tt> is <tt>false</tt>,
-<br/><tab2/> - <tt>is_­convertible_­v&lt;<i>alloc-optional</i>&lt;U&gt;&amp;, T&gt;</tt> is <tt>false</tt>,
+<br/><tab2/> - <tt>is_­convertible_­v&lt;pmr::optional&lt;U&gt;&amp;, T&gt;</tt> is <tt>false</tt>,
 <br/><tab2/> - <tt>is_­convertible_­v&lt;optional&lt;U&gt;&amp;&amp;, T&gt;</tt> is <tt>false</tt>,
-<br/><tab2/> - <tt>is_­convertible_­v&lt;<i>alloc-optional</i>&lt;U&gt;&amp;&amp;, T&gt;</tt> is <tt>false</tt>,
+<br/><tab2/> - <tt>is_­convertible_­v&lt;pmr::optional&lt;U&gt;&amp;&amp;, T&gt;</tt> is <tt>false</tt>,
 <br/><tab2/> - <tt>is_­convertible_­v&lt;const optional&lt;U&gt;&amp;, T&gt;</tt> is <tt>false</tt>,
-<br/><tab2/> - <tt>is_­convertible_­v&lt;const <i>alloc-optional</i>&lt;U&gt;&amp;, T&gt;</tt> is <tt>false</tt>,
+<br/><tab2/> - <tt>is_­convertible_­v&lt;const pmr::optional&lt;U&gt;&amp;, T&gt;</tt> is <tt>false</tt>,
 <br/><tab2/> - <tt>is_­convertible_­v&lt;const optional&lt;U&gt;&amp;&amp;, T&gt;</tt> is <tt>false</tt>, and
-<br/><tab2/> - <tt>is_­convertible_­v&lt;const <i>alloc-optional</i>&lt;U&gt;&amp;&amp;, T&gt;</tt> is <tt>false</tt>
-<br/><tab/>The expression inside <tt>explicit</tt> is equivalent to:
-<br/><tab2/><tt>!is_convertible_v&lt;const U&amp;, T&gt;</tt>
-<br/>
+<br/><tab2/> - <tt>is_­convertible_­v&lt;const pmr::optional&lt;U&gt;&amp;&amp;, T&gt;</tt> is <tt>false</tt>
+<br/>     
 
 <br/>
-<br/><code>template&lt;class U&gt; explicit(see below) optional(<i>alloc-optional</i>&lt;U&gt;&amp;&amp; rhs);</code>
-<br/><tab/><i>Effects:</i> If <tt>rhs</tt> contains a value, initializes the contained value
+<br/><code>template&lt;class U&gt; explicit(<i>see below</i>) optional(pmr::optional&lt;U&gt;&amp;&amp; rhs);</code>
+<br/><tab/><i>Effects:</i> If <tt>rhs</tt> contains a value, initializes the contained value 
  as if direct-non-list-initializing an object of type <tt>T</tt> with the expression <tt>std​::​move(*rhs)</tt>.
 <tt>std​::​move(*rhs)</tt> as the constructor argument. <tt>bool(rhs)</tt> is unchanged.
 <br/><tab/><i>Ensures:</i> <tt>bool(rhs) == bool(*this)</tt>.
@@ -369,23 +402,22 @@ Otherwise, the alias template denotes <tt>std::optional</tt>. </ins></p></blockq
 <br/><tab2/> - <tt>is_­constructible_­v&lt;T,U&amp;&amp;&gt;</tt> is <tt>true</tt>,
 <br/><tab2/> - <tt>is_same&lt;T,U&gt;</tt> is <tt>false</tt>,
 <br/><tab2/> - <tt>is_­constructible_­v&lt;T, optional&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>,
-<br/><tab2/> - <tt>is_­constructible_­v&lt;T, <i>alloc-optional</i>&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>,
+<br/><tab2/> - <tt>is_­constructible_­v&lt;T, pmr::optional&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>,
 <br/><tab2/> - <tt>is_­constructible_­v&lt;T, optional&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>,
-<br/><tab2/> - <tt>is_­constructible_­v&lt;T, <i>alloc-optional</i>&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>,
+<br/><tab2/> - <tt>is_­constructible_­v&lt;T, pmr::optional&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>,
 <br/><tab2/> - <tt>is_­constructible_­v&lt;T, const optional&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>,
-<br/><tab2/> - <tt>is_­constructible_­v&lt;T, const <i>alloc-optional</i>&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>,
+<br/><tab2/> - <tt>is_­constructible_­v&lt;T, const pmr::optional&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>,
 <br/><tab2/> - <tt>is_­constructible_­v&lt;T, const optional&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>,
-<br/><tab2/> - <tt>is_­constructible_­v&lt;T, const <i>alloc-optional</i>&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>,
+<br/><tab2/> - <tt>is_­constructible_­v&lt;T, const pmr::optional&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>,
 <br/><tab2/> - <tt>is_­convertible_­v&lt;optional&lt;U&gt;&amp;, T&gt;</tt> is <tt>false</tt>,
-<br/><tab2/> - <tt>is_­convertible_­v&lt;<i>alloc-optional</i>&lt;U&gt;&amp;, T&gt;</tt> is <tt>false</tt>,
+<br/><tab2/> - <tt>is_­convertible_­v&lt;pmr::optional&lt;U&gt;&amp;, T&gt;</tt> is <tt>false</tt>,
 <br/><tab2/> - <tt>is_­convertible_­v&lt;optional&lt;U&gt;&amp;&amp;, T&gt;</tt> is <tt>false</tt>,
-<br/><tab2/> - <tt>is_­convertible_­v&lt;<i>alloc-optional</i>&lt;U&gt;&amp;&amp;, T&gt;</tt> is <tt>false</tt>,
+<br/><tab2/> - <tt>is_­convertible_­v&lt;pmr::optional&lt;U&gt;&amp;&amp;, T&gt;</tt> is <tt>false</tt>,
 <br/><tab2/> - <tt>is_­convertible_­v&lt;const optional&lt;U&gt;&amp;, T&gt;</tt> is <tt>false</tt>,
-<br/><tab2/> - <tt>is_­convertible_­v&lt;const <i>alloc-optional</i>&lt;U&gt;&amp;, T&gt;</tt> is <tt>false</tt>,
+<br/><tab2/> - <tt>is_­convertible_­v&lt;const pmr::optional&lt;U&gt;&amp;, T&gt;</tt> is <tt>false</tt>,
 <br/><tab2/> - <tt>is_­convertible_­v&lt;const optional&lt;U&gt;&amp;&amp;, T&gt;</tt> is <tt>false</tt>, and
-<br/><tab2/> - <tt>is_­convertible_­v&lt;const <i>alloc-optional</i>&lt;U&gt;&amp;&amp;, T&gt;</tt> is <tt>false</tt>
-
-<br/>
+<br/><tab2/> - <tt>is_­convertible_­v&lt;const pmr::optional&lt;U&gt;&amp;&amp;, T&gt;</tt> is <tt>false</tt>
+<br/>    
 </p>
 </ins></blockquote>
 
@@ -400,29 +432,29 @@ This operator shall not participate in overload resolution unless
 <br/><tab2/> - <tt>is_­constructible_­v&lt;T, const U&amp;&gt;</tt> is <tt>true</tt>,
 <br/><tab2/> - <tt>is_assignable&lt;T&amp;, const U&amp;&gt;</tt> is <tt>true</tt>,
 <br/><tab2/> - <tt>is_­constructible_­v&lt;T, optional&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>,
-<br/><tab2/><ins> - <tt>is_­constructible_­v&lt;T, <i>alloc-optional</i>&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>, </ins>
+<br/><tab2/><ins> - <tt>is_­constructible_­v&lt;T, pmr::optional&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>, </ins>
 <br/><tab2/> - <tt>is_­constructible_­v&lt;T, optional&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>,
-<br/><tab2/><ins>  - <tt>is_­constructible_­v&lt;T, <i>alloc-optional</i>&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>, </ins>
+<br/><tab2/><ins>  - <tt>is_­constructible_­v&lt;T, pmr::optional&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>, </ins>
 <br/><tab2/> - <tt>is_­constructible_­v&lt;T, const optional&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>,
-<br/><tab2/><ins>  - <tt>is_­constructible_­v&lt;T, const <i>alloc-optional</i>&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>, </ins>
+<br/><tab2/><ins>  - <tt>is_­constructible_­v&lt;T, const pmr::optional&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>, </ins>
 <br/><tab2/> - <tt>is_­constructible_­v&lt;T, const optional&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>,
-<br/><tab2/><ins>  - <tt>is_­constructible_­v&lt;T, const <i>alloc-optional</i>&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>, </ins>
+<br/><tab2/><ins>  - <tt>is_­constructible_­v&lt;T, const pmr::optional&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>, </ins>
 <br/><tab2/> - <tt>is_­convertible_­v&lt;optional&lt;U&gt;&amp;, T&gt;</tt> is <tt>false</tt>,
-<br/><tab2/><ins>  - <tt>is_­convertible_­v&lt;<i>alloc-optional</i>&lt;U&gt;&amp;, T&gt;</tt> is <tt>false</tt>, </ins>
+<br/><tab2/><ins>  - <tt>is_­convertible_­v&lt;pmr::optional&lt;U&gt;&amp;, T&gt;</tt> is <tt>false</tt>, </ins>
 <br/><tab2/> - <tt>is_­convertible_­v&lt;optional&lt;U&gt;&amp;&amp;, T&gt;</tt> is <tt>false</tt>,
-<br/><tab2/><ins>  - <tt>is_­convertible_­v&lt;<i>alloc-optional</i>&lt;U&gt;&amp;&amp;, T&gt;</tt> is <tt>false</tt>, </ins>
+<br/><tab2/><ins>  - <tt>is_­convertible_­v&lt;pmr::optional&lt;U&gt;&amp;&amp;, T&gt;</tt> is <tt>false</tt>, </ins>
 <br/><tab2/> - <tt>is_­convertible_­v&lt;const optional&lt;U&gt;&amp;, T&gt;</tt> is <tt>false</tt>,
-<br/><tab2/><ins>  - <tt>is_­convertible_­v&lt;const <i>alloc-optional</i>&lt;U&gt;&amp;, T&gt;</tt> is <tt>false</tt>, </ins>
+<br/><tab2/><ins>  - <tt>is_­convertible_­v&lt;const pmr::optional&lt;U&gt;&amp;, T&gt;</tt> is <tt>false</tt>, </ins>
 <br/><tab2/> - <tt>is_­convertible_­v&lt;const optional&lt;U&gt;&amp;&amp;, T&gt;</tt> is <tt>false</tt>,
-<br/><tab2/><ins>  - <tt>is_­convertible_­v&lt;const <i>alloc-optional</i>&lt;U&gt;&amp;&amp;, T&gt;</tt> is <tt>false</tt>, </ins>
+<br/><tab2/><ins>  - <tt>is_­convertible_­v&lt;const pmr::optional&lt;U&gt;&amp;&amp;, T&gt;</tt> is <tt>false</tt>, </ins>
 <br/><tab2/> - <tt>is_assignable_v&lt;T&amp;, optional&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>,
-<br/><tab2/><ins>  - <tt>is_assignable_v&lt;T&amp;, <i>alloc-optional</i>&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>, </ins>
+<br/><tab2/><ins>  - <tt>is_assignable_v&lt;T&amp;, pmr::optional&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>, </ins>
 <br/><tab2/> - <tt>is_assignable_v&lt;T&amp;, optional&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>,
-<br/><tab2/><ins>  - <tt>is_assignable_v&lt;T&amp;, <i>alloc-optional</i>&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>, </ins>
+<br/><tab2/><ins>  - <tt>is_assignable_v&lt;T&amp;, pmr::optional&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>, </ins>
 <br/><tab2/> - <tt>is_assignable_v&lt;T&amp;, const optional&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>, <del>and</del>
-<br/><tab2/><ins>  - <tt>is_assignable_v&lt;T&amp;, const <i>alloc-optional</i>&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>, </ins>
+<br/><tab2/><ins>  - <tt>is_assignable_v&lt;T&amp;, const pmr::optional&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>, </ins>
 <br/><tab2/> - <tt>is_assignable_v&lt;T&amp;, const optional&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>,<ins>and</ins>
-<br/><tab2/><ins>  - <tt>is_assignable_v&lt;T&amp;, const <i>alloc-optional</i>&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt> </ins>
+<br/><tab2/><ins>  - <tt>is_assignable_v&lt;T&amp;, const pmr::optional&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt> </ins>
 </blockquote>
 </p>
 <p>
@@ -435,39 +467,39 @@ This operator shall not participate in overload resolution unless
 <br/><tab2/> - <tt>is_­constructible_­v&lt;T, const U&amp;&gt;</tt> is <tt>true</tt>,
 <br/><tab2/> - <tt>is_assignable&lt;T&amp;, const U&amp;&gt;</tt> is <tt>true</tt>,
 <br/><tab2/> - <tt>is_­constructible_­v&lt;T, optional&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>,
-<br/><tab2/><ins> - <tt>is_­constructible_­v&lt;T, <i>alloc-optional</i>&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>, </ins>
+<br/><tab2/><ins> - <tt>is_­constructible_­v&lt;T, pmr::optional&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>, </ins>
 <br/><tab2/> - <tt>is_­constructible_­v&lt;T, optional&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>,
-<br/><tab2/><ins>  - <tt>is_­constructible_­v&lt;T, <i>alloc-optional</i>&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>, </ins>
+<br/><tab2/><ins>  - <tt>is_­constructible_­v&lt;T, pmr::optional&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>, </ins>
 <br/><tab2/> - <tt>is_­constructible_­v&lt;T, const optional&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>,
-<br/><tab2/><ins>  - <tt>is_­constructible_­v&lt;T, const <i>alloc-optional</i>&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>, </ins>
+<br/><tab2/><ins>  - <tt>is_­constructible_­v&lt;T, const pmr::optional&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>, </ins>
 <br/><tab2/> - <tt>is_­constructible_­v&lt;T, const optional&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>,
-<br/><tab2/><ins>  - <tt>is_­constructible_­v&lt;T, const <i>alloc-optional</i>&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>, </ins>
+<br/><tab2/><ins>  - <tt>is_­constructible_­v&lt;T, const pmr::optional&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>, </ins>
 <br/><tab2/> - <tt>is_­convertible_­v&lt;optional&lt;U&gt;&amp;, T&gt;</tt> is <tt>false</tt>,
-<br/><tab2/><ins>  - <tt>is_­convertible_­v&lt;<i>alloc-optional</i>&lt;U&gt;&amp;, T&gt;</tt> is <tt>false</tt>, </ins>
+<br/><tab2/><ins>  - <tt>is_­convertible_­v&lt;pmr::optional&lt;U&gt;&amp;, T&gt;</tt> is <tt>false</tt>, </ins>
 <br/><tab2/> - <tt>is_­convertible_­v&lt;optional&lt;U&gt;&amp;&amp;, T&gt;</tt> is <tt>false</tt>,
-<br/><tab2/><ins>  - <tt>is_­convertible_­v&lt;<i>alloc-optional</i>&lt;U&gt;&amp;&amp;, T&gt;</tt> is <tt>false</tt>, </ins>
+<br/><tab2/><ins>  - <tt>is_­convertible_­v&lt;pmr::optional&lt;U&gt;&amp;&amp;, T&gt;</tt> is <tt>false</tt>, </ins>
 <br/><tab2/> - <tt>is_­convertible_­v&lt;const optional&lt;U&gt;&amp;, T&gt;</tt> is <tt>false</tt>,
-<br/><tab2/><ins>  - <tt>is_­convertible_­v&lt;const <i>alloc-optional</i>&lt;U&gt;&amp;, T&gt;</tt> is <tt>false</tt>, </ins>
+<br/><tab2/><ins>  - <tt>is_­convertible_­v&lt;const pmr::optional&lt;U&gt;&amp;, T&gt;</tt> is <tt>false</tt>, </ins>
 <br/><tab2/> - <tt>is_­convertible_­v&lt;const optional&lt;U&gt;&amp;&amp;, T&gt;</tt> is <tt>false</tt>,
-<br/><tab2/><ins>  - <tt>is_­convertible_­v&lt;const <i>alloc-optional</i>&lt;U&gt;&amp;&amp;, T&gt;</tt> is <tt>false</tt>, </ins>
+<br/><tab2/><ins>  - <tt>is_­convertible_­v&lt;const pmr::optional&lt;U&gt;&amp;&amp;, T&gt;</tt> is <tt>false</tt>, </ins>
 <br/><tab2/> - <tt>is_assignable_v&lt;T&amp;, optional&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>,
-<br/><tab2/><ins>  - <tt>is_assignable_v&lt;T&amp;, <i>alloc-optional</i>&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>, </ins>
+<br/><tab2/><ins>  - <tt>is_assignable_v&lt;T&amp;, pmr::optional&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>, </ins>
 <br/><tab2/> - <tt>is_assignable_v&lt;T&amp;, optional&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>,
-<br/><tab2/><ins>  - <tt>is_assignable_v&lt;T&amp;, <i>alloc-optional</i>&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>, </ins>
+<br/><tab2/><ins>  - <tt>is_assignable_v&lt;T&amp;, pmr::optional&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>, </ins>
 <br/><tab2/> - <tt>is_assignable_v&lt;T&amp;, const optional&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>, <del>and</del>
-<br/><tab2/><ins>  - <tt>is_assignable_v&lt;T&amp;, const <i>alloc-optional</i>&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>, </ins>
-<br/><tab2/> - <tt>is_assignable_v&lt;T&amp;, const optional&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>,<ins>and</ins>
-<br/><tab2/><ins>  - <tt>is_assignable_v&lt;T&amp;, const <i>alloc-optional</i>&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt> </ins>
+<br/><tab2/><ins>  - <tt>is_assignable_v&lt;T&amp;, const pmr::optional&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>, </ins>
+<br/><tab2/> - <tt>is_assignable_v&lt;T&amp;, const optional&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>,<ins>and</ins> 
+<br/><tab2/><ins>  - <tt>is_assignable_v&lt;T&amp;, const pmr::optional&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt> </ins>
 </blockquote>
 </p>
 
 <blockquote><ins>
 <br/>
-<br/><tt>template&lt;class U&gt; optional&amp; operator=(const <i>alloc-optional</i>&lt;U&gt;&amp; rhs);</tt>
+<br/><tt>template&lt;class U&gt; optional&amp; operator=(const pmr::optional&lt;U&gt;&amp; rhs);</tt>
 <br/><tab/><i>Effects:</i> See Table
 <blockquote>
 <table border="1">
-<caption><ins>Table &mdash; <tt>optional operator=(const <i>alloc-optional</i>&lt;U&gt;&amp;)</tt> effects</ins></caption>
+<caption><ins>Table &mdash; <tt>optional operator=(const pmr::optional&lt;U&gt;&amp;)</tt> effects</ins></caption>
 <tr>
 <th></th>
 <th><ins><tt>*this</tt> contains a value</ins></th>
@@ -496,37 +528,37 @@ determined by the exception safety guarantee of <tt>T</tt>'s assignment.
 <br/><tab2/> - <tt>is_­constructible_­v&lt;T, const U&amp;&gt;</tt> is <tt>true</tt>,
 <br/><tab2/> - <tt>is_assignable&lt;T&amp;, const U&amp;&gt;</tt> is <tt>true</tt>,
 <br/><tab2/> - <tt>is_­constructible_­v&lt;T, optional&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>,
-<br/><tab2/> - <tt>is_­constructible_­v&lt;T, <i>alloc-optional</i>&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>,
-<br/><tab2/> - <tt>is_­constructible_­v&lt;T, optional&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>,
-<br/><tab2/> - <tt>is_­constructible_­v&lt;T, <i>alloc-optional</i>&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>,
+<br/><tab2/> - <tt>is_­constructible_­v&lt;T, pmr::optional&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>,
+<br/><tab2/> - <tt>is_­constructible_­v&lt;T, optional&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>, 
+<br/><tab2/> - <tt>is_­constructible_­v&lt;T, pmr::optional&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>,
 <br/><tab2/> - <tt>is_­constructible_­v&lt;T, const optional&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>,
-<br/><tab2/> - <tt>is_­constructible_­v&lt;T, const <i>alloc-optional</i>&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>,
-<br/><tab2/> - <tt>is_­constructible_­v&lt;T, const optional&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>,
-<br/><tab2/> - <tt>is_­constructible_­v&lt;T, const <i>alloc-optional</i>&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>,
+<br/><tab2/> - <tt>is_­constructible_­v&lt;T, const pmr::optional&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>,
+<br/><tab2/> - <tt>is_­constructible_­v&lt;T, const optional&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>, 
+<br/><tab2/> - <tt>is_­constructible_­v&lt;T, const pmr::optional&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>,
 <br/><tab2/> - <tt>is_­convertible_­v&lt;const U&amp;, T&gt;</tt> is <tt>true</tt>,
 <br/><tab2/> - <tt>is_­convertible_­v&lt;optional&lt;U&gt;&amp;, T&gt;</tt> is <tt>false</tt>,
-<br/><tab2/> - <tt>is_­convertible_­v&lt;<i>alloc-optional</i>&lt;U&gt;&amp;, T&gt;</tt> is <tt>false</tt>,
-<br/><tab2/> - <tt>is_­convertible_­v&lt;optional&lt;U&gt;&amp;&amp;, T&gt;</tt> is <tt>false</tt>,
-<br/><tab2/> - <tt>is_­convertible_­v&lt;<i>alloc-optional</i>&lt;U&gt;&amp;&amp;, T&gt;</tt> is <tt>false</tt>,
+<br/><tab2/> - <tt>is_­convertible_­v&lt;pmr::optional&lt;U&gt;&amp;, T&gt;</tt> is <tt>false</tt>,
+<br/><tab2/> - <tt>is_­convertible_­v&lt;optional&lt;U&gt;&amp;&amp;, T&gt;</tt> is <tt>false</tt>, 
+<br/><tab2/> - <tt>is_­convertible_­v&lt;pmr::optional&lt;U&gt;&amp;&amp;, T&gt;</tt> is <tt>false</tt>,
 <br/><tab2/> - <tt>is_­convertible_­v&lt;const optional&lt;U&gt;&amp;, T&gt;</tt> is <tt>false</tt>,
-<br/><tab2/> - <tt>is_­convertible_­v&lt;const <i>alloc-optional</i>&lt;U&gt;&amp;, T&gt;</tt> is <tt>false</tt>,
+<br/><tab2/> - <tt>is_­convertible_­v&lt;const pmr::optional&lt;U&gt;&amp;, T&gt;</tt> is <tt>false</tt>,
 <br/><tab2/> - <tt>is_­convertible_­v&lt;const optional&lt;U&gt;&amp;&amp;, T&gt;</tt> is <tt>false</tt>,
-<br/><tab2/> - <tt>is_­convertible_­v&lt;const <i>alloc-optional</i>&lt;U&gt;&amp;&amp;, T&gt;</tt> is <tt>false</tt>,
+<br/><tab2/> - <tt>is_­convertible_­v&lt;const pmr::optional&lt;U&gt;&amp;&amp;, T&gt;</tt> is <tt>false</tt>,
 <br/><tab2/> - <tt>is_assignable_v&lt;T&amp;, optional&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>,
-<br/><tab2/> - <tt>is_assignable_v&lt;T&amp;, <i>alloc-optional</i>&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>,
-<br/><tab2/> - <tt>is_assignable_v&lt;T&amp;, optional&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>,
-<br/><tab2/> - <tt>is_assignable_v&lt;T&amp;, <i>alloc-optional</i>&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>,
+<br/><tab2/> - <tt>is_assignable_v&lt;T&amp;, pmr::optional&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>,
+<br/><tab2/> - <tt>is_assignable_v&lt;T&amp;, optional&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>, 
+<br/><tab2/> - <tt>is_assignable_v&lt;T&amp;, pmr::optional&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>,
 <br/><tab2/> - <tt>is_assignable_v&lt;T&amp;, const optional&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>,
-<br/><tab2/> - <tt>is_assignable_v&lt;T&amp;, const <i>alloc-optional</i>&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>,
+<br/><tab2/> - <tt>is_assignable_v&lt;T&amp;, const pmr::optional&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>,
 <br/><tab2/> - <tt>is_assignable_v&lt;T&amp;, const optional&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>, and
-<br/><tab2/> - <tt>is_assignable_v&lt;T&amp;, const <i>alloc-optional</i>&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>
+<br/><tab2/> - <tt>is_assignable_v&lt;T&amp;, const pmr::optional&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>
 
 <br/>
-<br/><tt>template&lt;class U&gt; optional&amp; operator=(<i>alloc-optional</i>&lt;U&gt;&amp;&amp; rhs);</tt>
+<br/><tt>template&lt;class U&gt; optional&amp; operator=(pmr::optional&lt;U&gt;&amp;&amp; rhs);</tt>
 <br/><tab/><i>Effects:</i> See Table
 <blockquote>
 <table border="1">
-<caption><ins>Table &mdash; <tt>optional operator=(<i>alloc-optional</i>&lt;U&gt;&amp;&amp;)</tt> effects</ins></caption>
+<caption><ins>Table &mdash; <tt>optional operator=(pmr::optional&lt;U&gt;&amp;&amp;)</tt> effects</ins></caption>
 <tr>
 <th></th>
 <th><ins><tt>*this</tt> contains a value</ins></th>
@@ -554,30 +586,30 @@ determined by the exception safety guarantee of <tt>T</tt>'s assignment.
 <br/><tab2/> - <tt>is_­constructible_­v&lt;T, const U&amp;&gt;</tt> is <tt>true</tt>,
 <br/><tab2/> - <tt>is_assignable&lt;T&amp;, const U&amp;&gt;</tt> is <tt>true</tt>,
 <br/><tab2/> - <tt>is_­constructible_­v&lt;T, std::optional&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>,
-<br/><tab2/> - <tt>is_­constructible_­v&lt;T, <i>alloc-optional</i>&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>,
+<br/><tab2/> - <tt>is_­constructible_­v&lt;T, pmr::optional&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>,
 <br/><tab2/> - <tt>is_­constructible_­v&lt;T, std::optional&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>,
-<br/><tab2/> - <tt>is_­constructible_­v&lt;T, <i>alloc-optional</i>&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>,
+<br/><tab2/> - <tt>is_­constructible_­v&lt;T, pmr::optional&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>,
 <br/><tab2/> - <tt>is_­constructible_­v&lt;T, const std::optional&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>,
-<br/><tab2/> - <tt>is_­constructible_­v&lt;T, const <i>alloc-optional</i>&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>,
+<br/><tab2/> - <tt>is_­constructible_­v&lt;T, const pmr::optional&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>,
 <br/><tab2/> - <tt>is_­constructible_­v&lt;T, const std::optional&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>,
-<br/><tab2/> - <tt>is_­constructible_­v&lt;T, const <i>alloc-optional</i>&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>,
+<br/><tab2/> - <tt>is_­constructible_­v&lt;T, const pmr::optional&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>,
 <br/><tab2/> - <tt>is_­convertible_­v&lt;const U&amp;, T&gt;</tt> is <tt>true</tt>,
 <br/><tab2/> - <tt>is_­convertible_­v&lt;std::optional&lt;U&gt;&amp;, T&gt;</tt> is <tt>false</tt>,
-<br/><tab2/> - <tt>is_­convertible_­v&lt;<i>alloc-optional</i>&lt;U&gt;&amp;, T&gt;</tt> is <tt>false</tt>,
+<br/><tab2/> - <tt>is_­convertible_­v&lt;pmr::optional&lt;U&gt;&amp;, T&gt;</tt> is <tt>false</tt>,
 <br/><tab2/> - <tt>is_­convertible_­v&lt;std::optional&lt;U&gt;&amp;&amp;, T&gt;</tt> is <tt>false</tt>,
-<br/><tab2/> - <tt>is_­convertible_­v&lt;<i>alloc-optional</i>&lt;U&gt;&amp;&amp;, T&gt;</tt> is <tt>false</tt>,
+<br/><tab2/> - <tt>is_­convertible_­v&lt;pmr::optional&lt;U&gt;&amp;&amp;, T&gt;</tt> is <tt>false</tt>,
 <br/><tab2/> - <tt>is_­convertible_­v&lt;const std::optional&lt;U&gt;&amp;, T&gt;</tt> is <tt>false</tt>,
-<br/><tab2/> - <tt>is_­convertible_­v&lt;const <i>alloc-optional</i>&lt;U&gt;&amp;, T&gt;</tt> is <tt>false</tt>,
+<br/><tab2/> - <tt>is_­convertible_­v&lt;const pmr::optional&lt;U&gt;&amp;, T&gt;</tt> is <tt>false</tt>,
 <br/><tab2/> - <tt>is_­convertible_­v&lt;const std::optional&lt;U&gt;&amp;&amp;, T&gt;</tt> is <tt>false</tt>,
-<br/><tab2/> - <tt>is_­convertible_­v&lt;const <i>alloc-optional</i>&lt;U&gt;&amp;&amp;, T&gt;</tt> is <tt>false</tt>,
+<br/><tab2/> - <tt>is_­convertible_­v&lt;const pmr::optional&lt;U&gt;&amp;&amp;, T&gt;</tt> is <tt>false</tt>,
 <br/><tab2/> - <tt>is_assignable_v&lt;T&amp;, std::optional&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>,
-<br/><tab2/> - <tt>is_assignable_v&lt;T&amp;, <i>alloc-optional</i>&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>,
+<br/><tab2/> - <tt>is_assignable_v&lt;T&amp;, pmr::optional&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>,
 <br/><tab2/> - <tt>is_assignable_v&lt;T&amp;, std::optional&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>,
-<br/><tab2/> - <tt>is_assignable_v&lt;T&amp;, <i>alloc-optional</i>&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>,
+<br/><tab2/> - <tt>is_assignable_v&lt;T&amp;, pmr::optional&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>,
 <br/><tab2/> - <tt>is_assignable_v&lt;T&amp;, const std::optional&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>,
-<br/><tab2/> - <tt>is_assignable_v&lt;T&amp;, const <i>alloc-optional</i>&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>,
+<br/><tab2/> - <tt>is_assignable_v&lt;T&amp;, const pmr::optional&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>,
 <br/><tab2/> - <tt>is_assignable_v&lt;T&amp;, const std::optional&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>, and
-<br/><tab2/> - <tt>is_assignable_v&lt;T&amp;, const <i>alloc-optional</i>&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>
+<br/><tab2/> - <tt>is_assignable_v&lt;T&amp;, const pmr::optional&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>
 
 
 </ins></blockquote>
@@ -589,180 +621,184 @@ Insert new sections after 20.6.3 Class template optional [optional.optional]
 <p><h3><ins> Header &lt;pmroptional&gt; synopsis [pmroptional.sys]</pmroptional></ins></h3>
 
 <blockquote><ins><code>
-namespace pmr {
-<br/><tab/>  // [alloc-optional.optional], class template <t><i>alloc-optional</i></t> for exposition only
+namespace std::pmr {	
+<br/><tab/>  // [pmroptional.optional]
 <br/><tab/>   template&lt;class T&gt;
-<br/><tab2/>     class <i>alloc-optional</i>;
+<br/><tab2/>     class optional;
+<br/>		  
+<br/><tab/>  // [pmroptional.traits], allocator-related traits
+<br/><tab/>    template&ltclass T&gt;
+<br/><tab2/>   struct uses_allocator&ltT, polymorphic_allocator&lt;&gt;&gt;;
 <br/>
- <br/><tab/>  // [optional.relops], relational operators
+ <br/><tab/>  // [pmroptional.relops], relational operators
 <br/><tab/>   template&lt;class T, class U&gt;
-<br/><tab2/>	bool operator==(const <i>alloc-optional</i>&lt;T&gt;&amp;, const <i>alloc-optional</i>&lt;U&gt;&amp;);
+<br/><tab2/>	bool operator==(const optional&lt;T&gt;&amp;, const optional&lt;U&gt;&amp;);
 <br/><tab/>   template&lt;class T, class U&gt;
-<br/><tab2/>	bool operator==(const <i>alloc-optional</i>&lt;T&gt;&amp;, const std::optional&lt;U&gt;&amp;);
+<br/><tab2/>	bool operator==(const optional&lt;T&gt;&amp;, const std::optional&lt;U&gt;&amp;);
 <br/><tab/>   template&lt;class T, class U&gt;
-<br/><tab2/>	bool operator==(const std::optional&lt;T&gt;&amp;, const <i>alloc-optional</i>&lt;U&gt;&amp;);
+<br/><tab2/>	bool operator==(const std::optional&lt;T&gt;&amp;, const optional&lt;U&gt;&amp;);
 <br/><tab/>   template&lt;class T, class U&gt;
-<br/><tab2/>	bool operator!=(const <i>alloc-optional</i>&lt;T&gt;&amp;, const <i>alloc-optional</i>&lt;U&gt;&amp;);
+<br/><tab2/>	bool operator!=(const optional&lt;T&gt;&amp;, const optional&lt;U&gt;&amp;);
 <br/><tab/>   template&lt;class T, class U&gt;
-<br/><tab2/>	bool operator!=(const <i>alloc-optional</i>&lt;T&gt;&amp;, const std::optional&lt;U&gt;&amp;);
+<br/><tab2/>	bool operator!=(const optional&lt;T&gt;&amp;, const std::optional&lt;U&gt;&amp;);
 <br/><tab/>   template&lt;class T, class U&gt;
-<br/><tab2/>	bool operator!=(const std::optional&lt;T&gt;&amp;, const <i>alloc-optional</i>&lt;U&gt;&amp;);
+<br/><tab2/>	bool operator!=(const std::optional&lt;T&gt;&amp;, const optional&lt;U&gt;&amp;);
 <br/><tab/>   template&lt;class T, class U&gt;
-<br/><tab2/>	bool operator&lt;(const <i>alloc-optional</i>&lt;T&gt;&amp;, const <i>alloc-optional</i>&lt;U&gt;&amp;);
+<br/><tab2/>	bool operator&lt;(const optional&lt;T&gt;&amp;, const optional&lt;U&gt;&amp;);
 <br/><tab/>   template&lt;class T, class U&gt;
-<br/><tab2/>	bool operator&lt;(const <i>alloc-optional</i>&lt;T&gt;&amp;, const std::optional&lt;U&gt;&amp;);
+<br/><tab2/>	bool operator&lt;(const optional&lt;T&gt;&amp;, const std::optional&lt;U&gt;&amp;);
 <br/><tab/>   template&lt;class T, class U&gt;
-<br/><tab2/>	bool operator&lt;(const std::optional&lt;T&gt;&amp;, const <i>alloc-optional</i>&lt;U&gt;&amp;);
+<br/><tab2/>	bool operator&lt;(const std::optional&lt;T&gt;&amp;, const optional&lt;U&gt;&amp;);
 <br/><tab/>   template&lt;class T, class U&gt;
-<br/><tab2/>	bool operator&gt;(const <i>alloc-optional</i>&lt;T&gt;&amp;, const <i>alloc-optional</i>&lt;U&gt;&amp;);
+<br/><tab2/>	bool operator&gt;(const optional&lt;T&gt;&amp;, const optional&lt;U&gt;&amp;);
 <br/><tab/>   template&lt;class T, class U&gt;
-<br/><tab2/>	bool operator&gt;(const <i>alloc-optional</i>&lt;T&gt;&amp;, const std::optional&lt;U&gt;&amp;);
+<br/><tab2/>	bool operator&gt;(const optional&lt;T&gt;&amp;, const std::optional&lt;U&gt;&amp;);
 <br/><tab/>   template&lt;class T, class U&gt;
-<br/><tab2/>	bool operator&gt;(const std::optional&lt;T&gt;&amp;, const <i>alloc-optional</i>&lt;U&gt;&amp;);
+<br/><tab2/>	bool operator&gt;(const std::optional&lt;T&gt;&amp;, const optional&lt;U&gt;&amp;);
 <br/><tab/>   template&lt;class T, class U&gt;
-<br/><tab2/>	bool operator&lt;=(const <i>alloc-optional</i>&lt;T&gt;&amp;, const <i>alloc-optional</i>&lt;U&gt;&amp;);
+<br/><tab2/>	bool operator&lt;=(const optional&lt;T&gt;&amp;, const optional&lt;U&gt;&amp;);
 <br/><tab/>   template&lt;class T, class U&gt;
-<br/><tab2/>	bool operator&lt;=(const <i>alloc-optional</i>&lt;T&gt;&amp;, const std::optional&lt;U&gt;&amp;);
+<br/><tab2/>	bool operator&lt;=(const optional&lt;T&gt;&amp;, const std::optional&lt;U&gt;&amp;);
 <br/><tab/>   template&lt;class T, class U&gt;
-<br/><tab2/>	bool operator&lt;=(const std::optional&lt;T&gt;&amp;, const <i>alloc-optional</i>&lt;U&gt;&amp;);
+<br/><tab2/>	bool operator&lt;=(const std::optional&lt;T&gt;&amp;, const optional&lt;U&gt;&amp;);
 <br/><tab/>   template&lt;class T, class U&gt;
-<br/><tab2/>	bool operator&gt;=(const <i>alloc-optional</i>&lt;T&gt;&amp;, const <i>alloc-optional</i>&lt;U&gt;&amp;);
+<br/><tab2/>	bool operator&gt;=(const optional&lt;T&gt;&amp;, const optional&lt;U&gt;&amp;);
 <br/><tab/>   template&lt;class T, class U&gt;
-<br/><tab2/>	bool operator&gt;=(const <i>alloc-optional</i>&lt;T&gt;&amp;, const std::optional&lt;U&gt;&amp;);
+<br/><tab2/>	bool operator&gt;=(const optional&lt;T&gt;&amp;, const std::optional&lt;U&gt;&amp;);
 <br/><tab/>   template&lt;class T, class U&gt;
-<br/><tab2/>	bool operator&gt;=(const std::optional&lt;T&gt;&amp;, const <i>alloc-optional</i>&lt;U&gt;&amp;);
+<br/><tab2/>	bool operator&gt;=(const std::optional&lt;T&gt;&amp;, const optional&lt;U&gt;&amp;);
 <br/><tab/>   template&lt;class T, three_way_comparable_with&lt;T&gt; U&gt;
 <br/><tab2/>	compare_three_way_result_t&lt;T,U&gt;
-<br/><tab/><tab2/>      operator&lt;=&gt;(const <i>alloc-optional</i>&lt;T&gt;&amp;, const <i>alloc-optional</i>&lt;U&gt;&amp;);
+<br/><tab/><tab2/>      operator&lt;=&gt;(const optional&lt;T&gt;&amp;, const optional&lt;U&gt;&amp;);
 <br/><tab/>   template&lt;class T, three_way_comparable_with&lt;T&gt; U&gt;
 <br/><tab2/>	compare_three_way_result_t&lt;T,U&gt;
-<br/><tab/><tab2/>      operator&lt;=&gt;(const <i>alloc-optional</i>&lt;T&gt;&amp;, const std::optional&lt;U&gt;&amp;);
+<br/><tab/><tab2/>      operator&lt;=&gt;(const optional&lt;T&gt;&amp;, const std::optional&lt;U&gt;&amp;);
 <br/><tab/>   template&lt;class T, three_way_comparable_with&lt;T&gt; U&gt;
 <br/><tab2/>	compare_three_way_result_t&lt;T,U&gt;
-<br/><tab/><tab2/>      operator&lt;=&gt;(const std::optional&lt;T&gt;&amp;, const <i>alloc-optional</i>&lt;U&gt;&amp;);
+<br/><tab/><tab2/>      operator&lt;=&gt;(const std::optional&lt;T&gt;&amp;, const optional&lt;U&gt;&amp;);
 <br/>
-<br/><tab/>  // [<i>alloc-optional</i>.nullops], comparison with nullopt
-<br/><tab/>   template&lt;class T&gt; bool operator==(const <i>alloc-optional</i>&lt;T&gt;&amp;, nullopt_t) noexcept;
+<br/><tab/>  // [pmroptional.nullops], comparison with nullopt
+<br/><tab/>   template&lt;class T&gt; bool operator==(const optional&lt;T&gt;&amp;, nullopt_t) noexcept;
 <br/><tab/>   template&lt;class T&gt;
-<br/><tab2/>	strong_ordering operator&lt;=&gt;(const <i>alloc-optional</i>&lt;T&gt;&amp;, nullopt_t) noexcept;
+<br/><tab2/>	strong_ordering operator&lt;=&gt;(const optional&lt;T&gt;&amp;, nullopt_t) noexcept;
 <br/>
- <br/><tab/> // [<i>alloc-optional</i>.comp.with.t], comparison with T
-<br/><tab/>   template&lt;class T, class U&gt; bool operator==(const <i>alloc-optional</i>&lt;T&gt;&amp;, const U&amp;);
-<br/><tab/>   template&lt;class T, class U&gt; bool operator==(const T&amp;, const <i>alloc-optional</i>&lt;U&gt;&amp;);
-<br/><tab/>   template&lt;class T, class U&gt; bool operator!=(const <i>alloc-optional</i>&lt;T&gt;&amp;, const U&amp;);
-<br/><tab/>   template&lt;class T, class U&gt; bool operator!=(const T&amp;, const <i>alloc-optional</i>&lt;U&gt;&amp;);
-<br/><tab/>   template&lt;class T, class U&gt; bool operator&lt;(const <i>alloc-optional</i>&lt;T&gt;&amp;, const U&amp;);
-<br/><tab/>   template&lt;class T, class U&gt; bool operator&lt;(const T&amp;, const <i>alloc-optional</i>&lt;U&gt;&amp;);
-<br/><tab/>   template&lt;class T, class U&gt; bool operator&gt;(const <i>alloc-optional</i>&lt;T&gt;&amp;, const U&amp;);
-<br/><tab/>   template&lt;class T, class U&gt; bool operator&gt;(const T&amp;, const <i>alloc-optional</i>&lt;U&gt;&amp;);
-<br/><tab/>   template&lt;class T, class U&gt; bool operator&lt;=(const <i>alloc-optional</i>&lt;T&gt;&amp;, const U&amp;);
-<br/><tab/>   template&lt;class T, class U&gt; bool operator&lt;=(const T&amp;, const <i>alloc-optional</i>&lt;U&gt;&amp;);
-<br/><tab/>   template&lt;class T, class U&gt; bool operator&gt;=(const <i>alloc-optional</i>&lt;T&gt;&amp;, const U&amp;);
-<br/><tab/>   template&lt;class T, class U&gt; bool operator&gt;=(const T&amp;, const <i>alloc-optional</i>&lt;U&gt;&amp;);
+ <br/><tab/> // [pmroptional.comp.with.t], comparison with T
+<br/><tab/>   template&lt;class T, class U&gt; bool operator==(const optional&lt;T&gt;&amp;, const U&amp;);
+<br/><tab/>   template&lt;class T, class U&gt; bool operator==(const T&amp;, const optional&lt;U&gt;&amp;);
+<br/><tab/>   template&lt;class T, class U&gt; bool operator!=(const optional&lt;T&gt;&amp;, const U&amp;);
+<br/><tab/>   template&lt;class T, class U&gt; bool operator!=(const T&amp;, const optional&lt;U&gt;&amp;);
+<br/><tab/>   template&lt;class T, class U&gt; bool operator&lt;(const optional&lt;T&gt;&amp;, const U&amp;);
+<br/><tab/>   template&lt;class T, class U&gt; bool operator&lt;(const T&amp;, const optional&lt;U&gt;&amp;);
+<br/><tab/>   template&lt;class T, class U&gt; bool operator&gt;(const optional&lt;T&gt;&amp;, const U&amp;);
+<br/><tab/>   template&lt;class T, class U&gt; bool operator&gt;(const T&amp;, const optional&lt;U&gt;&amp;);
+<br/><tab/>   template&lt;class T, class U&gt; bool operator&lt;=(const optional&lt;T&gt;&amp;, const U&amp;);
+<br/><tab/>   template&lt;class T, class U&gt; bool operator&lt;=(const T&amp;, const optional&lt;U&gt;&amp;);
+<br/><tab/>   template&lt;class T, class U&gt; bool operator&gt;=(const optional&lt;T&gt;&amp;, const U&amp;);
+<br/><tab/>   template&lt;class T, class U&gt; bool operator&gt;=(const T&amp;, const optional&lt;U&gt;&amp;);
 <br/><tab/>   template&lt;class T, three_way_comparable_with&lt;T&gt; U&gt;
 <br/><tab2/>	compare_three_way_result_t&lt;T,U&gt;
-<br/><tab/><tab2/>      operator&lt;=&gt;(const <i>alloc-optional</i>&lt;T&gt;&amp;, const U&amp;);
+<br/><tab/><tab2/>      operator&lt;=&gt;(const optional&lt;T&gt;&amp;, const U&amp;);
 <br/>
- <br/><tab/> // [<i>alloc-optional</i>.specalg], specialized algorithms
+ <br/><tab/> // [pmroptional.specalg], specialized algorithms
 <br/><tab/>   template&lt;class T&gt;
-<br/><tab2/>    void swap(<i>alloc-optional</i>&lt;T&gt;&amp;, <i>alloc-optional</i>&lt;T&gt;&amp;) noexcept(see below);
+<br/><tab2/>    void swap(optional&lt;T&gt;&amp;, optional&lt;T&gt;&amp;) noexcept(<i>see below</i>);
 <br/>
 <br/><tab/>   template&lt;class T&gt;
-<br/><tab2/>	constexpr optional&lt;<i/>see below</i>&gt; make_optional(T&amp;&amp;);
-<br/><tab/>   template&lt;class T, class... Args>
-<br/><tab2/>	constexpr optional&lt;T&gt; make_optional(Args&amp;&amp;... args);
+<br/><tab2/>	constexpr optional&lt;<i>see below</i>&gt; make_optional(T&amp;&amp;);
+<br/><tab/>   template&lt;class T&gt;
+<br/><tab2/>    constexpr optional&lt;T&gt; make_optional();
+<br/><tab/>   template&lt;class T, class Arg0, class... Args>
+<br/><tab2/>	constexpr optional&lt;T&gt; make_optional(Arg0 arg0&amp;&amp;, Args&amp;&amp;... args);
 <br/><tab/>   template&lt;class T, class U, class... Args>
 <br/><tab2/>	constexpr optional&lt;T&gt; make_optional(initializer_list&lt;U&gt; il, Args&amp;&amp;... args);
 <br/>
 <br/><tab/>   template&lt;class T&gt;
-<br/><tab2/>	constexpr optional&lt;<i/>see below</i>&gt; alloc_optional(const polymorphic_allocator&lt;&gt;&amp; a, T&amp;&amp;);
+<br/><tab2/>	constexpr optional&lt;<i>see below</i>&gt; make_optional(allocator_arg_t, const polymorphic_allocator&lt;&gt;&amp; a, T&amp;&amp;);
 <br/><tab/>   template&lt;class T, class... Args>
-<br/><tab2/>	constexpr optional&lt;T&gt; alloc_optional(const polymorphic_allocator&lt;&gt;&amp; a, Args&amp;&amp;... args);
+<br/><tab2/>	constexpr optional&lt;T&gt; make_optional(allocator_arg_t, const polymorphic_allocator&lt;&gt;&amp; a, Args&amp;&amp;... args);
 <br/><tab/>   template&lt;class T, class U, class... Args>
-<br/><tab2/>	constexpr optional&lt;T&gt; alloc_optional(const polymorphic_allocator&lt;&gt;&amp; a, initializer_list&lt;U&gt; il, Args&amp;&amp;... args);
+<br/><tab2/>	constexpr optional&lt;T&gt; make_optional(allocator_arg_t, const polymorphic_allocator&lt;&gt;&amp; a, initializer_list&lt;U&gt; il, Args&amp;&amp;... args);
 <br/>
- <br/><tab/> // [<i>alloc-optional</i>.hash], hash support
-<br/><tab/>   template&lt;class T&gt; struct hash&lt;<i>alloc-optional</i>&lt;T&gt;&gt;;
+ <br/><tab/> // [pmroptional.hash], hash support
+<br/><tab/>   template&lt;class T&gt; struct hash&lt;optional&lt;T&gt;&gt;;
 <br/>}
-<!--
-<br/> namespace std {
-<br/><tab/> template&lt;typename T&gt;
-<br/><tab2/>   struct uses_allocator&lt;<i>alloc-optional</i>&lt;T&gt;, pmr::polymorphic_allocator&lt;&gt;&gt;
- <br/><tab2/><tab/> : public uses_allocator&lt;T, pmr::polymorphic_allocator&lt;&gt;&gt;::type { };
-<br/>}
--->
+
 </code></ins></blockquote></p>
 
-<p><h3><ins> Class template <i>alloc-optional</i>  [<i>alloc-optional</i>.pmroptional]</ins></h3></p>
+<p><h3><ins> Class template optional  [optional.pmroptional]</ins></h3></p>
 <p>
 <blockquote><ins>
 <code>
 namespace std::pmr {
  <br/><tab/>   template&lt;class T&gt;
-<br/><tab/> class <i>alloc-optional</i> {
+<br/><tab/> class optional <i> see below</i>{
 <br/><tab/> public:
 <br/><tab2/> using value_type = T;
-<br/><tab2/> using allocator_type = std::pmr::polymorphic_allocator&lt;&gt;;
+<br/><tab2/> using allocator_type = polymorphic_allocator&lt;&gt;; // <i>not always defined, see below</i>
 <br/>
-<br/><tab2/>    // [<i>alloc-optional</i>.ctor], constructors
-    <br/><tab2/><i>alloc-optional</i>() noexcept;
-    <br/><tab2/><i>alloc-optional</i>(nullopt_t) noexcept;
-    <br/><tab2/><i>alloc-optional</i>(const <i>alloc-optional</i>&amp;);
-    <br/><tab2/><i>alloc-optional</i>(<i>alloc-optional</i>&amp;&amp;) noexcept(see below);
+<br/><tab2/>    // [pmroptional.ctor], constructors
+    <br/><tab2/>optional() noexcept;
+    <br/><tab2/>optional(nullopt_t) noexcept;
+    <br/><tab2/>optional(const optional&amp;);
+    <br/><tab2/>optional(optional&amp;&amp;) noexcept(<i>see below</i>);
+    <br/><tab2/>optional(const std::optional&amp;);
+    <br/><tab2/>optional(std::optional&amp;&amp;);	
     <br/><tab2/>template&lt;class... Args&gt;
-      <br/><tab2/><tab/>explicit <i>alloc-optional</i>(in_place_t, Args&amp;&amp;...);
+      <br/><tab2/><tab/>explicit optional(in_place_t, Args&amp;&amp;...);
     <br/><tab2/>template&lt;class U, class... Args&gt;
-      <br/><tab2/><tab/>explicit <i>alloc-optional</i>(in_place_t, initializer_list&lt;U&gt;, Args&amp;&amp;...);
+      <br/><tab2/><tab/>explicit optional(in_place_t, initializer_list&lt;U&gt;, Args&amp;&amp;...);
     <br/><tab2/>template&lt;class U = T&gt;
-      <br/><tab2/><tab/>explicit(see below) <i>alloc-optional</i>(U&amp;&amp;);
+      <br/><tab2/><tab/>explicit(<i>see below</i>) optional(U&amp;&amp;);
     <br/><tab2/>template&lt;class U&gt;
-      <br/><tab2/><tab/>explicit(see below) <i>alloc-optional</i>(const <i>alloc-optional</i>&lt;U&gt;&amp;);
+      <br/><tab2/><tab/>explicit(<i>see below</i>) optional(const optional&lt;U&gt;&amp;);
     <br/><tab2/>template&lt;class U&gt;
-      <br/><tab2/><tab/>explicit(see below) <i>alloc-optional</i>(<i>alloc-optional</i>&lt;U&gt;&amp;&amp;);
+      <br/><tab2/><tab/>explicit(<i>see below</i>) optional(optional&lt;U&gt;&amp;&amp;);
 	<br/><tab2/>template&lt;class U&gt;
-      <br/><tab2/><tab/>explicit(see below) <i>alloc-optional</i>(const std::optional&lt;U&gt;&amp;);
+      <br/><tab2/><tab/>explicit(<i>see below</i>) optional(const std::optional&lt;U&gt;&amp;);
     <br/><tab2/>template&lt;class U&gt;
-      <br/><tab2/><tab/>explicit(see below) <i>alloc-optional</i>(std::optional&lt;U&gt;&amp;&amp;);
+      <br/><tab2/><tab/>explicit(<i>see below</i>) optional(std::optional&lt;U&gt;&amp;&amp;);
       <br/>
-    <br/><tab2/>// allocator-extended constructors
-    <br/><tab2/><i>alloc-optional</i>(allocator_arg_t, const polymorphic_allocator&lt;&gt;&amp;) noexcept;
-    <br/><tab2/><i>alloc-optional</i>(allocator_arg_t, const polymorphic_allocator&lt;&gt;&amp;, nullopt_t) noexcept;
-    <br/><tab2/><i>alloc-optional</i>(allocator_arg_t, const polymorphic_allocator&lt;&gt;&amp;, const <i>alloc-optional</i>&amp;);
-    <br/><tab2/><i>alloc-optional</i>(allocator_arg_t, const polymorphic_allocator&lt;&gt;&amp;, <i>alloc-optional</i>&amp;&amp;) noexcept(see below);
+    <br/><tab2/>// allocator-extended constructors  
+    <br/><tab2/>optional(allocator_arg_t, const polymorphic_allocator&lt;&gt;&amp;) noexcept; // <i>not always provided, see below</i>
+    <br/><tab2/>optional(allocator_arg_t, const polymorphic_allocator&lt;&gt;&amp;, nullopt_t) noexcept; // <i>not always provided, see below</i>
+    <br/><tab2/>optional(allocator_arg_t, const polymorphic_allocator&lt;&gt;&amp;, const optional&amp;); // <i>not always provided, see below</i>
+    <br/><tab2/>optional(allocator_arg_t, const polymorphic_allocator&lt;&gt;&amp;, optional&amp;&amp;) noexcept(<i>see below</i>); // <i>not always provided, see below</i>
+    <br/><tab2/>optional(allocator_arg_t, const polymorphic_allocator&lt;&gt;&amp;, const std::optional&amp;); // <i>not always provided, see below</i>
+    <br/><tab2/>optional(allocator_arg_t, const polymorphic_allocator&lt;&gt;&amp;, std::optional&amp;&amp;); // <i>not always provided, see below</i>
     <br/><tab2/>template&lt;class... Args&gt;
-      <br/><tab2/><tab/>explicit <i>alloc-optional</i>(allocator_arg_t, const polymorphic_allocator&lt;&gt;&amp;, in_place_t,  Args&amp;&amp;...);
+      <br/><tab2/><tab/>explicit optional(allocator_arg_t, const polymorphic_allocator&lt;&gt;&amp;, in_place_t,  Args&amp;&amp;...); // <i>not always provided, see below</i>
     <br/><tab2/>template&lt;class U, class... Args&gt;
-      <br/><tab2/><tab/>explicit <i>alloc-optional</i>(allocator_arg_t, const polymorphic_allocator&lt;&gt;&amp;, in_place_t, initializer_list&lt;U&gt;, Args&amp;&amp;...);
-    <br/><tab2/>template&lt;class U = T&gt;
-      <br/><tab2/><tab/>explicit(see below) <i>alloc-optional</i>(allocator_arg_t, const polymorphic_allocator&lt;&gt;&amp;,U&amp;&amp;);
+      <br/><tab2/><tab/>explicit optional(allocator_arg_t, const polymorphic_allocator&lt;&gt;&amp;, in_place_t, initializer_list&lt;U&gt;, Args&amp;&amp;...); // <i>not always provided, see below</i>
+    <br/><tab2/>template&lt;class U = T&gt; 
+      <br/><tab2/><tab/>explicit(<i>see below</i>) optional(allocator_arg_t, const polymorphic_allocator&lt;&gt;&amp;,U&amp;&amp;); // <i>not always provided, see below</i>
     <br/><tab2/>template&lt;class U&gt;
-      <br/><tab2/><tab/>explicit(see below) <i>alloc-optional</i>(allocator_arg_t, const polymorphic_allocator&lt;&gt;&amp;,const <i>alloc-optional</i>&lt;U&gt;&amp;);
+      <br/><tab2/><tab/>explicit(<i>see below</i>) optional(allocator_arg_t, const polymorphic_allocator&lt;&gt;&amp;,const optional&lt;U&gt;&amp;); // <i>not always provided, see below</i>
     <br/><tab2/>template&lt;class U&gt;
-      <br/><tab2/><tab/>explicit(see below) <i>alloc-optional</i>(allocator_arg_t, const polymorphic_allocator&lt;&gt;&amp;,<i>alloc-optional</i>&lt;U&gt;&amp;&amp;);
+      <br/><tab2/><tab/>explicit(<i>see below</i>) optional(allocator_arg_t, const polymorphic_allocator&lt;&gt;&amp;,optional&lt;U&gt;&amp;&amp;); // <i>not always provided, see below</i>
 	<br/><tab2/>template&lt;class U&gt;
-      <br/><tab2/><tab/>explicit(see below) <i>alloc-optional</i>(allocator_arg_t, const polymorphic_allocator&lt;&gt;&amp;,const std::optional&lt;U&gt;&amp;);
+      <br/><tab2/><tab/>explicit(<i>see below</i>) optional(allocator_arg_t, const polymorphic_allocator&lt;&gt;&amp;,const std::optional&lt;U&gt;&amp;); // <i>not always provided, see below</i>
     <br/><tab2/>template&lt;class U&gt;
-      <br/><tab2/><tab/>explicit(see below) <i>alloc-optional</i>(allocator_arg_t, const polymorphic_allocator&lt;&gt;&amp;,std::optional&lt;U&gt;&amp;&amp;);
+      <br/><tab2/><tab/>explicit(<i>see below</i>) optional(allocator_arg_t, const polymorphic_allocator&lt;&gt;&amp;,std::optional&lt;U&gt;&amp;&amp;);  // <i>not always provided, see below</i>
 <br/>
-<br/><tab2/>    // [<i>alloc-optional</i>.dtor], destructor
-<br/><tab2/>    ~<i>alloc-optional</i>();
+<br/><tab2/>    // [pmroptional.dtor], destructor
+<br/><tab2/>    ~optional();
 <br/>
-<br/><tab2/>    // [<i>alloc-optional</i>.assign], assignment
-<br/><tab2/>    <i>alloc-optional</i>&amp; operator=(nullopt_t) noexcept;
-<br/><tab2/>    <i>alloc-optional</i>&amp; operator=(const <i>alloc-optional</i>&amp;);
-<br/><tab2/>    <i>alloc-optional</i>&amp; operator=(<i>alloc-optional</i>&amp;&amp;) noexcept(see below);
-<br/><tab2/>    template&lt;class U = T&gt; <i>alloc-optional</i>&amp; operator=(U&amp;&amp;);
-<br/><tab2/>    template&lt;class U&gt; <i>alloc-optional</i>&amp; operator=(const <i>alloc-optional</i>&lt;U&gt;&amp;);
-<br/><tab2/>    template&lt;class U&gt; <i>alloc-optional</i>&amp; operator=(<i>alloc-optional</i>&lt;U&gt;&amp;&amp;);
-<br/><tab2/>    template&lt;class U&gt; <i>alloc-optional</i>&amp; operator=(const std::optional&lt;U&gt;&amp;);
-<br/><tab2/>    template&lt;class U&gt; <i>alloc-optional</i>&amp; operator=(std::optional&lt;U&gt;&amp;&amp;);
+<br/><tab2/>    // [pmroptional.assign], assignment
+<br/><tab2/>    optional&amp; operator=(nullopt_t) noexcept;
+<br/><tab2/>    optional&amp; operator=(const optional&amp;);
+<br/><tab2/>    optional&amp; operator=(optional&amp;&amp;) noexcept(<i>see below</i>);
+<br/><tab2/>    template&lt;class U = T&gt; optional&amp; operator=(U&amp;&amp;);
+<br/><tab2/>    template&lt;class U&gt; optional&amp; operator=(const optional&lt;U&gt;&amp;);
+<br/><tab2/>    template&lt;class U&gt; optional&amp; operator=(optional&lt;U&gt;&amp;&amp;);
+<br/><tab2/>    template&lt;class U&gt; optional&amp; operator=(const std::optional&lt;U&gt;&amp;);
+<br/><tab2/>    template&lt;class U&gt; optional&amp; operator=(std::optional&lt;U&gt;&amp;&amp;);
 <br/><tab2/>    template&lt;class... Args&gt;> T&amp; emplace(Args&amp;&amp;...);
 <br/><tab2/>    template&lt;class U, class... Args&gt; T&amp; emplace(initializer_list&lt;U&gt;, Args&amp;&amp;...);
 <br/>
-<br/><tab2/>    // [<i>alloc-optional</i>.swap], swap
-<br/><tab2/>    void swap(<i>alloc-optional</i>&amp;) noexcept(see below);
+<br/><tab2/>    // [pmroptional.swap], swap
+<br/><tab2/>    void swap(optional&amp;) noexcept(<i>see below</i>);
 <br/>
-<br/><tab2/>    // [<i>alloc-optional</i>.observe], observers
+<br/><tab2/>    // [pmroptional.observe], observers
 <br/><tab2/>    const T* operator-&gt;() const;
 <br/><tab2/>    T* operator-&gt;();
 <br/><tab2/>    const T&amp; operator*() const&amp;;
@@ -777,102 +813,122 @@ namespace std::pmr {
 <br/><tab2/>    const T&amp;&amp; value() const&amp;&amp;;
 <br/><tab2/>    template&lt;class U&gt; T value_or(U&amp;&amp;) const&amp;;
 <br/><tab2/>    template&lt;class U&gt; T value_or(U&amp;&amp;) &amp;&amp;;
-<br/><tab2/>    template&lt;class U&gt; T value_or(allocator_arg_t, const polymorphic_allocator&lt;&gt;&amp;, U&amp;&amp;) const&amp;;
-<br/><tab2/>    template&lt;class U&gt; T value_or(allocator_arg_t, const polymorphic_allocator&lt;&gt;&amp;, U&amp;&amp;) &amp;&amp;;
+<br/><tab2/>    template&lt;class U&gt; T value_or(allocator_arg_t, const polymorphic_allocator&lt;&gt;&amp;, U&amp;&amp;) const&amp;; // <i>not always provided, see below</i>
+<br/><tab2/>    template&lt;class U&gt; T value_or(allocator_arg_t, const polymorphic_allocator&lt;&gt;&amp;, U&amp;&amp;) &amp;&amp;; // <i>not always provided, see below</i>
 <br/><tab2/>    allocator_type get_allocator() const noexcept;
 
 <br/>
- <br/><tab2/>   // [<i>alloc-optional</i>.mod], modifiers
+ <br/><tab2/>   // [pmroptional.mod], modifiers
 <br/><tab2/>    void reset() noexcept;
 <br/>
-<br/><tab2/>  private:
-<br/><tab2/><tab/>    T* val;         // exposition only
-<br/><tab2/><tab/>    const std::memory_resource*  M_pmr;         // exposition only
+<br/><tab/>  private:
+<br/><tab2/>    T* val;         // exposition only
+<br/><tab2/>    const polymorphic_allocator&lt;&gt;  <i>M_alloc</i>;         // <i> exposition only; not always provided, see below</i>
 <br/><tab/>  };
 <br/>
-<br/>/* todo CTAD */
+<br/><tab/>   template&lt;class T&gt;
+<br/><tab/>   optional(T) -&gt; optional&lt;T&gt;;
+<ins>
+<br/><tab/>   template&lt;class T&gt;
+<br/><tab/>   optional(const std::optional&lt;T&gt;&amp;) -&gt; optional&lt;T&gt;;
+<br/><tab/>   template&lt;class T&gt;
+<br/><tab/>   optional(std::optional&lt;T&gt;&amp;&amp;) -&gt; optional&lt;T&gt;;
 <br/>
 <br/>}
 </code>
 </blockquote></ins></p>
 
-<blockquote><ins>Any instance of <i>alloc-optional</i>&lt;T&gt; at any given time either contains a value or does not contain a value.
-When an instance of <i>alloc-optional</i>&lt;T&gt; contains a value, it means that an object of type <tt>T</tt>,
-referred to as the <i>alloc-optional</i> object's contained value,
-is allocated within the storage of the <i>alloc-optional</i> object. Implementations are not permitted to use
-additional storage, such as dynamic memory, to allocate its contained value. The contained value shall be allocated in a
-region of the <i>alloc-optional</i>&lt;T&gt; storage suitably aligned for the type <tt>T</tt> and constructed using <tt>M_pmr</tt>.
-When an object of type <i>alloc-optional</i>&lt;T&gt; is contextually
+<blockquote><ins>Any instance of optional&lt;T&gt; at any given time either contains a value or does not contain a value. 
+When an instance of <i>optional</i>&lt;T&gt; contains a value, it means that an object of type <tt>T</tt> 
+is allocated within the storage of the <i>optional</i> object. Implementations are not permitted to use 
+additional storage, such as dynamic memory, to allocate its contained value. The contained value shall be allocated in a 
+region of the <i>optional</i>&lt;T&gt; storage suitably aligned for the type <tt>T</tt> and, if <tt>uses_allocator&lt;T, polymorphic_allocator&lt;&gt;&gt;</tt> is true,
+constructed by uses-allocator construction 
+with allocator <tt><i>M_alloc</i></tt>. When an object of type <i>optional</i>&lt;T&gt; is contextually 
 converted to bool, the conversion returns true if the object contains a value; otherwise the conversion returns false.
 </ins></blockquote>
-<blockquote><ins>Member <tt>val</tt> is provided for exposition only. When an <i>alloc-optional</i>&lt;T&gt;
+<blockquote><ins>Member <tt>val</tt> is provided for exposition only. When an <i>optional</i>&lt;T&gt;
 object contains a value, val points to the contained value.
 </ins></blockquote>
-<blockquote><ins>Member <tt>M_pmr</tt> is provided for exposition only and points to the memory_resource used when
-creating the contained value. If the value type provides <tt>get_allocator()</tt> member function, and its return type is
-convertible to <tt>polymorphic_allocator&lt;&gt;</tt>, the implementation is
-allowed to assume that the allocator used for constructing the element is the same allocator as returned
-by <tt>T::get_allocator()</tt>. [<i>Note:</i> In such an implementation, <tt>pmr::optional&lt;pmr::string&gt;</tt>
+<blockquote><ins>If and only if <tt>uses_allocator&lt;T, polymorphic_allocator&lt;&gt;&gt;</tt> is <tt>false</tt>, optional&lt;T&gt; publicly inherits from 
+std::optional&lt;T&gt;
+</ins></blockquote>
+<blockquote><ins>If and only if <tt>uses_allocator&lt;T, polymorphic_allocator&lt;&gt;&gt;</tt> is <tt>true</tt>, the following applies :
+<br/> - <tt>allocator_type</tt> will be defined,
+<br/> - exposition only member <tt><i>M_alloc</i></tt> will be provided and will be used to create the contained value, if any, and
+<br/> - if &lt;T&gt; provides <tt>get_allocator()</tt> member function whose return type is convertible to <tt>polymorphic_allocator&lt;&gt;</tt>, the implementation is 
+allowed to assume that the allocator used for constructing the element is the same allocator as returned 
+by <tt>T::get_allocator()</tt>. [<i>Note:</i> In such an implementation, <tt>pmr::optional&lt;pmr::string&gt;</tt> 
 will be zero-overhead compared to <tt>optional&lt;pmr::string&gt;</tt>. -- <i>end note</i>]
 </ins></blockquote>
-<blockquote><ins><tt>T</tt> shall be a type other than <tt><i>cv</i> in_­place_­t</tt>, <tt><i>cv</i> allocator_arg_­t</tt>, or <tt><i>cv</i> nullopt_­t</tt>
+<blockquote><ins><tt>T</tt> shall be a type other than <tt><i>cv</i> in_­place_­t</tt>, <tt><i>cv</i> allocator_arg_­t</tt>, or <tt><i>cv</i> nullopt_­t</tt> 
 that meets the <i>Cpp17Destructible</i> requirements (Table 30).</ins></blockquote>
 
 
 
-<p><h4><ins> Constructors [<i>alloc-optional</i>.ctor]</ins></h4></p>
+<p><h4><ins> Constructors [pmroptional.ctor]</ins></h4></p>
 <p><blockquote><ins>
-<br/><code><i>alloc-optional</i>() noexcept;</code>
-<br/><code><i>alloc-optional</i>(nullopt_t) noexcept;</code>
-<br/><tab/><i>Effects:</i><tt>M_pmr</tt> is initialized with <tt>std::pmr::get_default_resource()</tt>
+<br/><code>optional() noexcept;</code>
+<br/><code>optional(nullopt_t) noexcept;</code>
+<br/><tab/><i>Effects:</i> If <tt>uses_allocator&lt;T, polymorphic_allocator&lt;&gt;&gt;</tt> is <tt>true</tt>, <tt><i>M_alloc</i></tt> is default initialized</tt>
 <br/><tab/><i>Ensures:</i> *this does not contain a value.
 <br/><tab/><i>Remarks:</i> No contained value is initialized.
 <br/>
-<br/><code><i>alloc-optional</i>(const <i>alloc-optional</i>&amp;);</code>
-<br/><tab/><i>Effects:</i> <tt>M_pmr</tt> is initialized with  <tt>std::pmr::get_default_resource()</tt>.
-If <tt>rhs</tt> contains a value, initializes the contained value
+<br/><code>optional(const optional&amp;);</code>
+<br/><tab/><i>Effects:</i> If <tt>uses_allocator&lt;T, polymorphic_allocator&lt;&gt;&gt;</tt> is <tt>true</tt>, <tt><i>M_alloc</i></tt> is default initialized</tt>. 
+If <tt>rhs</tt> contains a value, initializes the contained value 
 with the expression <tt>*rhs</tt>.
 <br/><tab/><i>Ensures:</i> <tt>bool(rhs) == bool(*this)</tt>.
 <br/><tab/><i>Throws:</i> Any exception thrown by the selected constructor of <tt>T</tt>.
-<br/><tab/><i>Remarks:</i> This constructor shall be defined as deleted unless <tt>is_­copy_­constructible_­v&lt;T&gt;</tt> is true.
+<br/><tab/><i>Mandates:</i><tt>is_­copy­constructible_­v&lt;T&gt;</tt> is true.
 
 <br/>
-<br/><code><i>alloc-optional</i>(<i>alloc-optional</i>&amp;&amp; rhs) noexcept(see below)</code>
-<br/><tab/><i>Effects:</i> <tt>M_pmr</tt> is initialized with <tt>rhs.M_pmr</tt>.
+<br/><code>optional(optional&amp;&amp; rhs) noexcept(<i>see below</i>)</code>
+<br/><tab/><i>Effects:</i> If <tt>uses_allocator&lt;T, polymorphic_allocator&lt;&gt;&gt;</tt> is <tt>true</tt>, <tt><i>M_alloc</i></tt> is initialized with <tt>rhs.<i>M_alloc</i></tt>. 
 If <tt>rhs</tt> contains a value, initializes the contained value
 with the expression <tt>std​::​move(*rhs)</tt>. <tt>bool(rhs)</tt> is unchanged.
 <br/><tab/><i>Ensures:</i> <tt>bool(rhs) == bool(*this)</tt>.
 <br/><tab/><i>Throws:</i> Any exception thrown by the selected constructor of <tt>T</tt>.
 <br/><tab/><i>Remarks:</i> The expression inside <tt>noexcept</tt> is equivalent to <tt>is_­nothrow_­move_­constructible_­v&lt;T&gt;</tt>.
 <br/><tab/><i>Mandates:</i><tt>is_­move_­constructible_­v&lt;T&gt;</tt> is true.
+<br/>
+<br/><code>optional(const std::optional&amp;);</code>
+<br/><tab/><i>Effects:</i> If <tt>uses_allocator&lt;T, polymorphic_allocator&lt;&gt;&gt;</tt> is <tt>true</tt>, <tt><i>M_alloc</i></tt> is default initialized</tt>. 
+If <tt>rhs</tt> contains a value, initializes the contained value 
+with the expression <tt>*rhs</tt>.
+<br/><tab/><i>Ensures:</i> <tt>bool(rhs) == bool(*this)</tt>.
+<br/><tab/><i>Throws:</i> Any exception thrown by the selected constructor of <tt>T</tt>.
+<br/><tab/><i>Mandates:</i><tt>is_­copy­constructible_­v&lt;T&gt;</tt> is true.
+
+<br/>
+<br/><code>optional(std::optional&amp;&amp; rhs)</code>
+<br/><tab/><i>Effects:</i> If <tt>uses_allocator&lt;T, polymorphic_allocator&lt;&gt;&gt;</tt> is <tt>true</tt>, <tt><i>M_alloc</i></tt> is initialized with <tt>rhs.<i>M_alloc</i></tt>. 
+If <tt>rhs</tt> contains a value, initializes the contained value
+with the expression <tt>std​::​move(*rhs)</tt>. <tt>bool(rhs)</tt> is unchanged.
+<br/><tab/><i>Ensures:</i> <tt>bool(rhs) == bool(*this)</tt>.
+<br/><tab/><i>Throws:</i> Any exception thrown by the selected constructor of <tt>T</tt>.
+<br/><tab/><i>Mandates:</i><tt>is_­move_­constructible_­v&lt;T&gt;</tt> is true.
 
 
 <br/>
-<br/><code>template&lt;class... Args&gt; explicit <i>alloc-optional</i>(in_place_t, Args&amp;&amp;... args);</code>
-<br/><tab/><i>Effects:</i> <tt>M_pmr</tt> is initialized with <tt>std::pmr::get_default_resource()</tt>.
-If <tt>rhs</tt> contains a value, initializes the contained value by uses-allocator construction
-with allocator <tt>polymorphic_allocator&lt;&gt;(_M_pmr)</tt> and
-<tt>std​::​forward&lt;Args&gt;(args)....</tt> as the constructor arguments.
+<br/><code>template&lt;class... Args&gt; explicit optional(in_place_t, Args&amp;&amp;... args);</code>
+<br/><tab/><i>Effects:</i> If <tt>uses_allocator&lt;T, polymorphic_allocator&lt;&gt;&gt;</tt> is <tt>true</tt>, <tt><i>M_alloc</i></tt> is default initialized</tt>.  
+Initializes the contained value with <tt>std​::​forward&lt;Args&gt;(args)....</tt>. 
 <br/><tab/><i>Ensures:</i> <tt>*this</tt> contains a value..
 <br/><tab/><i>Throws:</i> Any exception thrown by the selected constructor of <tt>T</tt>.
 <br/><tab/><i>Mandates:</i><tt>is_­copy_­constructible_­v&lt;T&gt;</tt> is true.
 
 <br/>
-<br/><code>template&lt;class... Args&gt; explicit <i>alloc-optional</i>(in_place_t, initializer_list&lt;U&gt; il, Args&amp;&amp;... args);</code>
-<br/><tab/><i>Effects:</i> <tt>M_pmr</tt> is initialized with <tt>std::pmr::get_default_resource()</tt>.
-If <tt>rhs</tt> contains a value, initializes the contained value by uses-allocator construction
-with allocator <tt>polymorphic_allocator&lt;&gt;(_M_pmr)</tt> and
-<tt>il, std​::​forward&lt;Args&gt;(args)....</tt> as the constructor arguments.
+<br/><code>template&lt;class... Args&gt; explicit optional(in_place_t, initializer_list&lt;U&gt; il, Args&amp;&amp;... args);</code>
+<br/><tab/><i>Effects:</i>  If <tt>uses_allocator&lt;T, polymorphic_allocator&lt;&gt;&gt;</tt> is <tt>true</tt>, <tt><i>M_alloc</i></tt> is default initialized</tt>. 
+Initializes the contained value with <tt>il and std​::​forward&lt;Args&gt;(args)....</tt>.
 <br/><tab/><i>Ensures:</i> <tt>*this</tt> contains a value..
 <br/><tab/><i>Throws:</i> Any exception thrown by the selected constructor of <tt>T</tt>.
-<br/><tab/><i>Mandates:</i><tt>is_­constructible_­v&lt;T, initializer_­list&lt;U&gt;&amp;, Args&amp;&amp;...&gt;</tt> is true.
-
+<br/><tab/><i>Mandates:</i><tt>is_­constructible_­v&lt;T, initializer_­list&lt;U&gt;&amp;, Args&amp;&amp;...&gt;</tt> is true.  
 <br/>
-<br/><code>template&lt;class U = T&gt; explicit(see below) <i>alloc-optional</i>(U&amp;&amp; rhs);</code>
-<br/><tab/><i>Effects:</i> <tt>M_pmr</tt> is initialized with <tt>std::pmr::get_default_resource()</tt>.
-If <tt>rhs</tt> contains a value, initializes the contained value by uses-allocator construction
-with allocator <tt>polymorphic_allocator&lt;&gt;(_M_pmr)</tt> and
-<tt> std​::​forward&lt;U&gt;(rhs)</tt> as the constructor arguments.
+<br/><code>template&lt;class U = T&gt; explicit(<i>see below</i>) optional(U&amp;&amp; rhs);</code>
+<br/><tab/><i>Effects:</i>If <tt>uses_allocator&lt;T, polymorphic_allocator&lt;&gt;&gt;</tt> is <tt>true</tt>, <tt><i>M_alloc</i></tt> is default initialized</tt>.
+Initializes the contained value with <tt> std​::​forward&lt;U&gt;(rhs)</tt>. 
 <br/><tab/><i>Ensures:</i> <tt>*this</tt> contains a value.
 <br/><tab/><i>Throws:</i> Any exception thrown by the selected constructor of <tt>T</tt>.
 <br/><tab/><i>Remarks:</i>The expression inside <tt>explicit</tt> is equivalent to:
@@ -881,80 +937,69 @@ with allocator <tt>polymorphic_allocator&lt;&gt;(_M_pmr)</tt> and
 <br/><tab2/> - <tt>is_­constructible_­v&lt;T, U&amp;&amp;&gt;</tt> is <tt>true</tt>,
 <br/><tab2/> - <tt>is_­same_­v&lt;remove_­cvref_­t&lt;U&gt;, in_­place_­t&gt</tt>
 is <tt>false</tt>, and
-<br/><tab2/> - <tt>is_­same_­v&lt;remove_­cvref_­t&lt;U&gt;,<i>alloc-optional</i>&gt</tt> is <tt>false</tt>.
-
+<br/><tab2/> - <tt>is_­same_­v&lt;remove_­cvref_­t&lt;U&gt;,optional&gt</tt> is <tt>false</tt>. 
 
 <br/>
-<br/><code>template&lt;class U&gt; explicit(see below) <i>alloc-optional</i>(const <i>alloc-optional</i>&lt;U&gt;&amp; rhs);</code>
-<br/><tab/><i>Effects:</i> <tt>M_pmr</tt> is initialized with <tt>std::pmr::get_default_resource()</tt>.
-If <tt>rhs</tt> contains a value, initializes the contained value by uses-allocator construction
-with allocator <tt>polymorphic_allocator&lt;&gt;(_M_pmr)</tt> and
-<tt>*rhs</tt> as the constructor argument.
+<br/><code>template&lt;class U&gt; explicit(<i>see below</i>) optional(const optional&lt;U&gt;&amp; rhs);</code>
+<br/><tab/><i>Effects:</i>If <tt>uses_allocator&lt;T, polymorphic_allocator&lt;&gt;&gt;</tt> is <tt>true</tt>, <tt><i>M_alloc</i></tt> is default initialized</tt>. 
+If <tt>rhs</tt> contains a value, initializes the contained value with <tt>*rhs</tt>. 
 <br/><tab/><i>Ensures:</i> <tt>bool(rhs) == bool(*this)</tt>.
 <br/><tab/><i>Throws:</i> Any exception thrown by the selected constructor of <tt>T</tt>.
 <br/><tab/><i>Remarks:</i>The expression inside <tt>explicit</tt> is equivalent to:
 <br/><tab2/><tt>!is_convertible_v&lt;const U&amp;, T&gt;</tt>
 <br/><tab/><i>Mandates:</i>
-<br/><tab2/> - <tt>is_­constructible_­v&lt;T, const U&amp;&gt;</tt> is <tt>true</tt>,
-<br/><tab2/> - <tt>is_same&lt;T,U&gt;</tt> is <tt>false</tt>,
-<br/><tab2/> - <tt>is_­constructible_­v&lt;T, std::optional&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>,
-<br/><tab2/> - <tt>is_­constructible_­v&lt;T, <i>alloc-optional</i>&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>,
-<br/><tab2/> - <tt>is_­constructible_­v&lt;T, std::optional&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>,
-<br/><tab2/> - <tt>is_­constructible_­v&lt;T, <i>alloc-optional</i>&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>,
-<br/><tab2/> - <tt>is_­constructible_­v&lt;T, const std::optional&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>,
-<br/><tab2/> - <tt>is_­constructible_­v&lt;T, const <i>alloc-optional</i>&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>,
-<br/><tab2/> - <tt>is_­constructible_­v&lt;T, const std::optional&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>,
-<br/><tab2/> - <tt>is_­constructible_­v&lt;T, const <i>alloc-optional</i>&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>,
-<br/><tab2/> - <tt>is_­convertible_­v&lt;std::optional&lt;U&gt;&amp;, T&gt;</tt> is <tt>false</tt>,
-<br/><tab2/> - <tt>is_­convertible_­v&lt;<i>alloc-optional</i>&lt;U&gt;&amp;, T&gt;</tt> is <tt>false</tt>,
-<br/><tab2/> - <tt>is_­convertible_­v&lt;std::optional&lt;U&gt;&amp;&amp;, T&gt;</tt> is <tt>false</tt>,
-<br/><tab2/> - <tt>is_­convertible_­v&lt;<i>alloc-optional</i>&lt;U&gt;&amp;&amp;, T&gt;</tt> is <tt>false</tt>,
-<br/><tab2/> - <tt>is_­convertible_­v&lt;const std::optional&lt;U&gt;&amp;, T&gt;</tt> is <tt>false</tt>,
-<br/><tab2/> - <tt>is_­convertible_­v&lt;const <i>alloc-optional</i>&lt;U&gt;&amp;, T&gt;</tt> is <tt>false</tt>,
+<br/><tab2/> - <tt>is_­constructible_­v&lt;T, const U&amp;&gt;</tt> is <tt>true</tt>, 
+<br/><tab2/> - <tt>is_­constructible_­v&lt;T, std::optional&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>, 
+<br/><tab2/> - <tt>is_­constructible_­v&lt;T, optional&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>, 
+<br/><tab2/> - <tt>is_­constructible_­v&lt;T, std::optional&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>, 
+<br/><tab2/> - <tt>is_­constructible_­v&lt;T, optional&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>, 
+<br/><tab2/> - <tt>is_­constructible_­v&lt;T, const std::optional&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>, 
+<br/><tab2/> - <tt>is_­constructible_­v&lt;T, const optional&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>, 
+<br/><tab2/> - <tt>is_­constructible_­v&lt;T, const std::optional&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>, 
+<br/><tab2/> - <tt>is_­constructible_­v&lt;T, const optional&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>, 
+<br/><tab2/> - <tt>is_­convertible_­v&lt;std::optional&lt;U&gt;&amp;, T&gt;</tt> is <tt>false</tt>, 
+<br/><tab2/> - <tt>is_­convertible_­v&lt;optional&lt;U&gt;&amp;, T&gt;</tt> is <tt>false</tt>, 
+<br/><tab2/> - <tt>is_­convertible_­v&lt;std::optional&lt;U&gt;&amp;&amp;, T&gt;</tt> is <tt>false</tt>, 
+<br/><tab2/> - <tt>is_­convertible_­v&lt;optional&lt;U&gt;&amp;&amp;, T&gt;</tt> is <tt>false</tt>, 
+<br/><tab2/> - <tt>is_­convertible_­v&lt;const std::optional&lt;U&gt;&amp;, T&gt;</tt> is <tt>false</tt>, 
+<br/><tab2/> - <tt>is_­convertible_­v&lt;const optional&lt;U&gt;&amp;, T&gt;</tt> is <tt>false</tt>, 
 <br/><tab2/> - <tt>is_­convertible_­v&lt;const std::optional&lt;U&gt;&amp;&amp;, T&gt;</tt> is <tt>false</tt>, and
-<br/><tab2/> - <tt>is_­convertible_­v&lt;const <i>alloc-optional</i>&lt;U&gt;&amp;&amp;, T&gt;</tt> is <tt>false</tt>
+<br/><tab2/> - <tt>is_­convertible_­v&lt;const optional&lt;U&gt;&amp;&amp;, T&gt;</tt> is <tt>false</tt> 
+<br/>     
+
 
 <br/>
-
-
-<br/>
-<br/><code>template&lt;class U&gt; explicit(see below) <i>alloc-optional</i>(<i>alloc-optional</i>&lt;U&gt;&amp;&amp; rhs);</code>
-<br/><tab/><i>Effects:</i> <tt>M_pmr</tt> is initialized with <tt>std::pmr::get_default_resource()</tt>.
-If <tt>rhs</tt> contains a value, initializes the contained value by uses-allocator construction
-with allocator <tt>polymorphic_allocator&lt;&gt;(_M_pmr)</tt> and
-<tt>std​::​move(*rhs)</tt> as the constructor argument. <tt>bool(rhs)</tt> is unchanged.
+<br/><code>template&lt;class U&gt; explicit(<i>see below</i>) optional(optional&lt;U&gt;&amp;&amp; rhs);</code>
+<br/><tab/><i>Effects:</i>If <tt>uses_allocator&lt;T, polymorphic_allocator&lt;&gt;&gt;</tt> is <tt>true</tt>, <tt><i>M_alloc</i></tt> is default initialized</tt>.
+If <tt>rhs</tt> contains a value, initializes the contained valuewith <tt>std​::​move(*rhs)</tt>. <tt>bool(rhs)</tt> is unchanged.
 <br/><tab/><i>Ensures:</i> <tt>bool(rhs) == bool(*this)</tt>.
 <br/><tab/><i>Throws:</i> Any exception thrown by the selected constructor of <tt>T</tt>.
 <br/><tab/><i>Remarks:</i>The expression inside <tt>explicit</tt> is equivalent to:
 <br/><tab2/><tt>!is_convertible_v&lt;U, T&gt;</tt 
 <br/><tab/><i>Mandates:</i>
-<br/><tab2/> - <tt>is_­constructible_­v&lt;T,U&amp;&amp;&gt;</tt> is <tt>true</tt>,
-<br/><tab2/> - <tt>is_same&lt;T,U&gt;</tt> is <tt>false</tt>,
-<br/><tab2/> - <tt>is_­constructible_­v&lt;T, std::optional&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>,
-<br/><tab2/> - <tt>is_­constructible_­v&lt;T, <i>alloc-optional</i>&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>,
-<br/><tab2/> - <tt>is_­constructible_­v&lt;T, std::optional&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>,
-<br/><tab2/> - <tt>is_­constructible_­v&lt;T, <i>alloc-optional</i>&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>,
-<br/><tab2/> - <tt>is_­constructible_­v&lt;T, const std::optional&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>,
-<br/><tab2/> - <tt>is_­constructible_­v&lt;T, const <i>alloc-optional</i>&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>,
-<br/><tab2/> - <tt>is_­constructible_­v&lt;T, const std::optional&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>,
-<br/><tab2/> - <tt>is_­constructible_­v&lt;T, const <i>alloc-optional</i>&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>,
-<br/><tab2/> - <tt>is_­convertible_­v&lt;std::optional&lt;U&gt;&amp;, T&gt;</tt> is <tt>false</tt>,
-<br/><tab2/> - <tt>is_­convertible_­v&lt;<i>alloc-optional</i>&lt;U&gt;&amp;, T&gt;</tt> is <tt>false</tt>,
-<br/><tab2/> - <tt>is_­convertible_­v&lt;std::optional&lt;U&gt;&amp;&amp;, T&gt;</tt> is <tt>false</tt>,
-<br/><tab2/> - <tt>is_­convertible_­v&lt;<i>alloc-optional</i>&lt;U&gt;&amp;&amp;, T&gt;</tt> is <tt>false</tt>,
-<br/><tab2/> - <tt>is_­convertible_­v&lt;const std::optional&lt;U&gt;&amp;, T&gt;</tt> is <tt>false</tt>,
-<br/><tab2/> - <tt>is_­convertible_­v&lt;const <i>alloc-optional</i>&lt;U&gt;&amp;, T&gt;</tt> is <tt>false</tt>,
+<br/><tab2/> - <tt>is_­constructible_­v&lt;T,U&amp;&amp;&gt;</tt> is <tt>true</tt>, 
+<br/><tab2/> - <tt>is_­constructible_­v&lt;T, std::optional&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>, 
+<br/><tab2/> - <tt>is_­constructible_­v&lt;T, optional&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>, 
+<br/><tab2/> - <tt>is_­constructible_­v&lt;T, std::optional&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>, 
+<br/><tab2/> - <tt>is_­constructible_­v&lt;T, optional&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>, 
+<br/><tab2/> - <tt>is_­constructible_­v&lt;T, const std::optional&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>, 
+<br/><tab2/> - <tt>is_­constructible_­v&lt;T, const optional&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>, 
+<br/><tab2/> - <tt>is_­constructible_­v&lt;T, const std::optional&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>, 
+<br/><tab2/> - <tt>is_­constructible_­v&lt;T, const optional&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>, 
+<br/><tab2/> - <tt>is_­convertible_­v&lt;std::optional&lt;U&gt;&amp;, T&gt;</tt> is <tt>false</tt>, 
+<br/><tab2/> - <tt>is_­convertible_­v&lt;optional&lt;U&gt;&amp;, T&gt;</tt> is <tt>false</tt>, 
+<br/><tab2/> - <tt>is_­convertible_­v&lt;std::optional&lt;U&gt;&amp;&amp;, T&gt;</tt> is <tt>false</tt>, 
+<br/><tab2/> - <tt>is_­convertible_­v&lt;optional&lt;U&gt;&amp;&amp;, T&gt;</tt> is <tt>false</tt>, 
+<br/><tab2/> - <tt>is_­convertible_­v&lt;const std::optional&lt;U&gt;&amp;, T&gt;</tt> is <tt>false</tt>, 
+<br/><tab2/> - <tt>is_­convertible_­v&lt;const optional&lt;U&gt;&amp;, T&gt;</tt> is <tt>false</tt>, 
 <br/><tab2/> - <tt>is_­convertible_­v&lt;const std::optional&lt;U&gt;&amp;&amp;, T&gt;</tt> is <tt>false</tt>, and
-<br/><tab2/> - <tt>is_­convertible_­v&lt;const <i>alloc-optional</i>&lt;U&gt;&amp;&amp;, T&gt;</tt> is <tt>false</tt>
+<br/><tab2/> - <tt>is_­convertible_­v&lt;const optional&lt;U&gt;&amp;&amp;, T&gt;</tt> is <tt>false</tt> 
+<br/>    
 
 <br/>
-
-<br/>
-<br/><code>template&lt;class U&gt; explicit(see below) <i>alloc-optional</i>(const std::optional&lt;U&gt;&amp; rhs);</code>
-<br/><tab/><i>Effects:</i> <tt>M_pmr</tt> is initialized with <tt>std::pmr::get_default_resource()</tt>.
-If <tt>rhs</tt> contains a value, initializes the contained value by uses-allocator construction
-with allocator <tt>polymorphic_allocator&lt;&gt;(_M_pmr)</tt> and
-<tt>*rhs</tt> as the constructor argument.
+<br/><code>template&lt;class U&gt; explicit(<i>see below</i>) optional(const std::optional&lt;U&gt;&amp; rhs);</code>
+<br/><tab/><i>Effects:</i>If <tt>uses_allocator&lt;T, polymorphic_allocator&lt;&gt;&gt;</tt> is <tt>true</tt>, <tt><i>M_alloc</i></tt> is default initialized</tt>.
+If <tt>rhs</tt> contains a value, initializes the contained value with <tt>*rhs</tt>. 
 <br/><tab/><i>Ensures:</i> <tt>bool(rhs) == bool(*this)</tt>.
 <br/><tab/><i>Throws:</i> Any exception thrown by the selected constructor of <tt>T</tt>.
 <br/><tab/><i>Remarks:</i>The expression inside <tt>explicit</tt> is equivalent to:
@@ -962,93 +1007,94 @@ with allocator <tt>polymorphic_allocator&lt;&gt;(_M_pmr)</tt> and
 <br/><tab/><i>Mandates:</i>
 <br/><tab2/> - <tt>is_­constructible_­v&lt;T, const U&amp;&gt;</tt> is <tt>true</tt>,
 <br/><tab2/> - <tt>is_­constructible_­v&lt;T, std::optional&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>,
-<br/><tab2/> - <tt>is_­constructible_­v&lt;T, <i>alloc-optional</i>&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>,
+<br/><tab2/> - <tt>is_­constructible_­v&lt;T, optional&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>,
 <br/><tab2/> - <tt>is_­constructible_­v&lt;T, std::optional&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>,
-<br/><tab2/> - <tt>is_­constructible_­v&lt;T, <i>alloc-optional</i>&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>,
+<br/><tab2/> - <tt>is_­constructible_­v&lt;T, optional&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>,
 <br/><tab2/> - <tt>is_­constructible_­v&lt;T, const std::optional&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>,
-<br/><tab2/> - <tt>is_­constructible_­v&lt;T, const <i>alloc-optional</i>&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>,
+<br/><tab2/> - <tt>is_­constructible_­v&lt;T, const optional&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>,
 <br/><tab2/> - <tt>is_­constructible_­v&lt;T, const std::optional&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>,
-<br/><tab2/> - <tt>is_­constructible_­v&lt;T, const <i>alloc-optional</i>&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>,
+<br/><tab2/> - <tt>is_­constructible_­v&lt;T, const optional&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>,
 <br/><tab2/> - <tt>is_­convertible_­v&lt;std::optional&lt;U&gt;&amp;, T&gt;</tt> is <tt>false</tt>,
-<br/><tab2/> - <tt>is_­convertible_­v&lt;<i>alloc-optional</i>&lt;U&gt;&amp;, T&gt;</tt> is <tt>false</tt>,
+<br/><tab2/> - <tt>is_­convertible_­v&lt;optional&lt;U&gt;&amp;, T&gt;</tt> is <tt>false</tt>,
 <br/><tab2/> - <tt>is_­convertible_­v&lt;std::optional&lt;U&gt;&amp;&amp;, T&gt;</tt> is <tt>false</tt>,
-<br/><tab2/> - <tt>is_­convertible_­v&lt;<i>alloc-optional</i>&lt;U&gt;&amp;&amp;, T&gt;</tt> is <tt>false</tt>,
+<br/><tab2/> - <tt>is_­convertible_­v&lt;optional&lt;U&gt;&amp;&amp;, T&gt;</tt> is <tt>false</tt>,
 <br/><tab2/> - <tt>is_­convertible_­v&lt;const std::optional&lt;U&gt;&amp;, T&gt;</tt> is <tt>false</tt>,
-<br/><tab2/> - <tt>is_­convertible_­v&lt;const <i>alloc-optional</i>&lt;U&gt;&amp;, T&gt;</tt> is <tt>false</tt>,
+<br/><tab2/> - <tt>is_­convertible_­v&lt;const optional&lt;U&gt;&amp;, T&gt;</tt> is <tt>false</tt>,
 <br/><tab2/> - <tt>is_­convertible_­v&lt;const std::optional&lt;U&gt;&amp;&amp;, T&gt;</tt> is <tt>false</tt>, and
-<br/><tab2/> - <tt>is_­convertible_­v&lt;const <i>alloc-optional</i>&lt;U&gt;&amp;&amp;, T&gt;</tt> is <tt>false</tt>
+<br/><tab2/> - <tt>is_­convertible_­v&lt;const optional&lt;U&gt;&amp;&amp;, T&gt;</tt> is <tt>false</tt>
+<br/>     
+
 
 <br/>
-
-
-<br/>
-<br/><code>template&lt;class U&gt; explicit(see below) <i>alloc-optional</i>(std::optional&lt;U&gt;&amp;&amp; rhs);</code>
-<br/><tab/><i>Effects:</i> <tt>M_pmr</tt> is initialized with <tt>std::pmr::get_default_resource()</tt>.
-If <tt>rhs</tt> contains a value, initializes the contained value by uses-allocator construction
-with allocator <tt>polymorphic_allocator&lt;&gt;(_M_pmr)</tt> and
-<tt>std​::​move(*rhs)</tt> as the constructor argument. <tt>bool(rhs)</tt> is unchanged.
+<br/><code>template&lt;class U&gt; explicit(<i>see below</i>) optional(std::optional&lt;U&gt;&amp;&amp; rhs);</code>
+<br/><tab/><i>Effects:</i>If <tt>uses_allocator&lt;T, polymorphic_allocator&lt;&gt;&gt;</tt>
+ is <tt>true</tt>, <tt><i>M_alloc</i></tt> is default initialized</tt>. 
+If <tt>rhs</tt> contains a value, initializes the contained value with <tt>std​::​move(*rhs)</tt>. 
+<tt>bool(rhs)</tt> is unchanged.
 <br/><tab/><i>Ensures:</i> <tt>bool(rhs) == bool(*this)</tt>.
 <br/><tab/><i>Throws:</i> Any exception thrown by the selected constructor of <tt>T</tt>.
 <br/><tab/><i>Remarks:</i><br/><tab/>The expression inside <tt>explicit</tt> is equivalent to:
 <br/><tab2/><tt>!is_convertible_v&lt;U, T&gt;</tt>
 <br/><tab/><i>Mandates:</i>
-<br/><tab2/> - <tt>is_­constructible_­v&lt;T,U&amp;&amp;&gt;</tt> is <tt>true</tt>,
-<br/><tab2/> - <tt>is_­constructible_­v&lt;T, std::optional&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>,
-<br/><tab2/> - <tt>is_­constructible_­v&lt;T, <i>alloc-optional</i>&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>,
-<br/><tab2/> - <tt>is_­constructible_­v&lt;T, std::optional&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>,
-<br/><tab2/> - <tt>is_­constructible_­v&lt;T, <i>alloc-optional</i>&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>,
-<br/><tab2/> - <tt>is_­constructible_­v&lt;T, const std::optional&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>,
-<br/><tab2/> - <tt>is_­constructible_­v&lt;T, const <i>alloc-optional</i>&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>,
-<br/><tab2/> - <tt>is_­constructible_­v&lt;T, const std::optional&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>,
-<br/><tab2/> - <tt>is_­constructible_­v&lt;T, const <i>alloc-optional</i>&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>,
-<br/><tab2/> - <tt>is_­convertible_­v&lt;std::optional&lt;U&gt;&amp;, T&gt;</tt> is <tt>false</tt>,
-<br/><tab2/> - <tt>is_­convertible_­v&lt;<i>alloc-optional</i>&lt;U&gt;&amp;, T&gt;</tt> is <tt>false</tt>,
-<br/><tab2/> - <tt>is_­convertible_­v&lt;std::optional&lt;U&gt;&amp;&amp;, T&gt;</tt> is <tt>false</tt>,
-<br/><tab2/> - <tt>is_­convertible_­v&lt;<i>alloc-optional</i>&lt;U&gt;&amp;&amp;, T&gt;</tt> is <tt>false</tt>,
-<br/><tab2/> - <tt>is_­convertible_­v&lt;const std::optional&lt;U&gt;&amp;, T&gt;</tt> is <tt>false</tt>,
-<br/><tab2/> - <tt>is_­convertible_­v&lt;const <i>alloc-optional</i>&lt;U&gt;&amp;, T&gt;</tt> is <tt>false</tt>,
-<br/><tab2/> - <tt>is_­convertible_­v&lt;const std::optional&lt;U&gt;&amp;&amp;, T&gt;</tt> is <tt>false</tt>, and
-<br/><tab2/> - <tt>is_­convertible_­v&lt;const <i>alloc-optional</i>&lt;U&gt;&amp;&amp;, T&gt;</tt> is <tt>false</tt>
-
-<br/>
+<br/><tab2/> - <tt>is_­constructible_­v&lt;T,U&amp;&amp;&gt;</tt> is <tt>true</tt>, 
+<br/><tab2/> - <tt>is_­constructible_­v&lt;T, std::optional&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>, 
+<br/><tab2/> - <tt>is_­constructible_­v&lt;T, optional&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>, 
+<br/><tab2/> - <tt>is_­constructible_­v&lt;T, std::optional&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>, 
+<br/><tab2/> - <tt>is_­constructible_­v&lt;T, optional&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>, 
+<br/><tab2/> - <tt>is_­constructible_­v&lt;T, const std::optional&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>, 
+<br/><tab2/> - <tt>is_­constructible_­v&lt;T, const optional&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>, 
+<br/><tab2/> - <tt>is_­constructible_­v&lt;T, const std::optional&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>, 
+<br/><tab2/> - <tt>is_­constructible_­v&lt;T, const optional&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>, 
+<br/><tab2/> - <tt>is_­convertible_­v&lt;std::optional&lt;U&gt;&amp;, T&gt;</tt> is <tt>false</tt>, 
+<br/><tab2/> - <tt>is_­convertible_­v&lt;optional&lt;U&gt;&amp;, T&gt;</tt> is <tt>false</tt>, 
+<br/><tab2/> - <tt>is_­convertible_­v&lt;std::optional&lt;U&gt;&amp;&amp;, T&gt;</tt> is <tt>false</tt>, 
+<br/><tab2/> - <tt>is_­convertible_­v&lt;optional&lt;U&gt;&amp;&amp;, T&gt;</tt> is <tt>false</tt>, 
+<br/><tab2/> - <tt>is_­convertible_­v&lt;const std::optional&lt;U&gt;&amp;, T&gt;</tt> is <tt>false</tt>, 
+<br/><tab2/> - <tt>is_­convertible_­v&lt;const optional&lt;U&gt;&amp;, T&gt;</tt> is <tt>false</tt>, 
+<br/><tab2/> - <tt>is_­convertible_­v&lt;const std::optional&lt;U&gt;&amp;&amp;, T&gt;</tt> is <tt>false</tt>, and 
+<br/><tab2/> - <tt>is_­convertible_­v&lt;const optional&lt;U&gt;&amp;&amp;, T&gt;</tt> is <tt>false</tt> 
+<br/>  
     <br/>
-
-
-<code>
-	<br/><i>alloc-optional</i>(allocator_arg_t, const polymorphic_allocator&lt;&gt;&amp;) noexcept;
-  <br/><i>alloc-optional</i>(allocator_arg_t, const polymorphic_allocator&lt;&gt;&amp;, nullopt_t) noexcept;
-    <br/><i>alloc-optional</i>(allocator_arg_t, const polymorphic_allocator&lt;&gt;&amp;, const <i>alloc-optional</i>&amp;);
-    <br/><i>alloc-optional</i>(allocator_arg_t, const polymorphic_allocator&lt;&gt;&amp;, <i>alloc-optional</i>&amp;&amp;) noexcept(see below);
+    
+    
+<code> 
+	<br/>optional(allocator_arg_t, const polymorphic_allocator&lt;&gt;&amp;) noexcept;
+  <br/>optional(allocator_arg_t, const polymorphic_allocator&lt;&gt;&amp;, nullopt_t) noexcept;
+    <br/>optional(allocator_arg_t, const polymorphic_allocator&lt;&gt;&amp;, const optional&amp;);
+    <br/>optional(allocator_arg_t, const polymorphic_allocator&lt;&gt;&amp;, optional&amp;&amp;) noexcept(<i>see below</i>);
+	
+    <br/>optional(allocator_arg_t, const polymorphic_allocator&lt;&gt;&amp;, const std::optional&amp;);
+    <br/>optional(allocator_arg_t, const polymorphic_allocator&lt;&gt;&amp;, std::optional&amp;&amp;);
     <br/>template&lt;class... Args&gt;
-      <br/><tab/>explicit <i>alloc-optional</i>(allocator_arg_t, const polymorphic_allocator&lt;&gt;&amp;, in_place_t, Args&amp;&amp;...);
+      <br/><tab/>explicit optional(allocator_arg_t, const polymorphic_allocator&lt;&gt;&amp;, in_place_t, Args&amp;&amp;...);
     <br/>template&lt;class U, class... Args&gt;
-      <br/><tab/>explicit <i>alloc-optional</i>(allocator_arg_t, const polymorphic_allocator&lt;&gt;&amp;, in_place_t, initializer_list&lt;U&gt;, Args&amp;&amp;...);
+      <br/><tab/>explicit optional(allocator_arg_t, const polymorphic_allocator&lt;&gt;&amp;, in_place_t, initializer_list&lt;U&gt;, Args&amp;&amp;...);
     <br/>template&lt;class U = T&gt;
-      <br/><tab/>explicit(see below) <i>alloc-optional</i>(allocator_arg_t, const polymorphic_allocator&lt;&gt;&amp;,U&amp;&amp;);
+      <br/><tab/>explicit(<i>see below</i>) optional(allocator_arg_t, const polymorphic_allocator&lt;&gt;&amp;,U&amp;&amp;);
     <br/>template&lt;class U&gt;
-      <br/><tab/>explicit(see below) <i>alloc-optional</i>(allocator_arg_t, const polymorphic_allocator&lt;&gt;&amp;,const <i>alloc-optional</i>&lt;U&gt;&amp;);
+      <br/><tab/>explicit(<i>see below</i>) optional(allocator_arg_t, const polymorphic_allocator&lt;&gt;&amp;,const optional&lt;U&gt;&amp;);
     <br/>template&lt;class U&gt;
-      <br/><tab/>explicit(see below) <i>alloc-optional</i>(allocator_arg_t, const polymorphic_allocator&lt;&gt;&amp;,<i>alloc-optional</i>&lt;U&gt;&amp;&amp;);
+      <br/><tab/>explicit(<i>see below</i>) optional(allocator_arg_t, const polymorphic_allocator&lt;&gt;&amp;,optional&lt;U&gt;&amp;&amp;);
 	<br/>template&lt;class U&gt;
-      <br/><tab/>explicit(see below) <i>alloc-optional</i>(allocator_arg_t, const polymorphic_allocator&lt;&gt;&amp;,const std::optional&lt;U&gt;&amp;);
+      <br/><tab/>explicit(<i>see below</i>) optional(allocator_arg_t, const polymorphic_allocator&lt;&gt;&amp;,const std::optional&lt;U&gt;&amp;);
     <br/>template&lt;class U&gt;
-      <br/><tab/>explicit(see below) <i>alloc-optional</i>(allocator_arg_t, const polymorphic_allocator&lt;&gt;&amp;,std::optional&lt;U&gt;&amp;&amp;);
+      <br/><tab/>explicit(<i>see below</i>) optional(allocator_arg_t, const polymorphic_allocator&lt;&gt;&amp;,std::optional&lt;U&gt;&amp;&amp;);  
  </code>
 <br/><tab/><i>Constraints:</i> <tt>uses_allocator&lt;T,polymorphic_allocator&lt;&gt;&gt;</tt> is true;
-<br/><tab/><i>Effects:</i> Equivalent to the preceding constructors except that <tt>M_pmr</tt> is initialized with <tt>a.resource()</tt>.
+<br/><tab/><i>Effects:</i> Equivalent to the preceding constructors except that <tt><i>M_alloc</i></tt> is initialized with <tt>a</tt>.
       </blockquote></ins></p>
 
-<p><h4><ins> Destructor [<i>alloc-optional</i>.dtor]</ins></h4></p>
+<p><h4><ins> Destructor [pmroptional.dtor]</ins></h4></p>
 <blockquote><ins>
-<br/><tt>~<i>alloc-optional</i>();</tt>
+<br/><tt>~optional();</tt>
 <br/><tab/><i>Effects:</i> If <tt>is_­trivially_­destructible_­v&lt;T&gt; != true</tt> and <tt>*this</tt> contains a value, calls
 <tt>val->T::~T()</tt>
 <br/><tab/><i>Remarks:</i> If <tt>is_­trivially_­destructible_­v&lt;T&gt;</tt> is <tt>true</tt>, then this destructor is trivial.
 </ins></blockquote>
 
-<p><h4><ins> Assignment [<i>alloc-optional</i>.assign]</ins></h4></p>
+<p><h4><ins> Assignment [pmroptional.assign]</ins></h4></p>
 <blockquote><ins>
-<br/><tt><i>alloc-optional</i>&lt;T&gt;&amp; operator=(nullopt_t) noexcept;</tt>
+<br/><tt>optional&lt;T&gt;&amp; operator=(nullopt_t) noexcept;</tt>
 <br/><tab/><i>Effects:</i> If <tt>*this</tt> contains a value, calls <tt>val->T::~T()</tt> to destroy the contained value; otherwise
 no effect.
 <br/><tab/><i>Remarks:</i> <tt>*this</tt>
@@ -1056,10 +1102,10 @@ no effect.
 
 
 <br/>
-<br/><tt><i>alloc-optional</i>&lt;T&gt;&amp; operator=(const <i>alloc-optional</i>&amp; rhs);</tt>
+<br/><tt>optional&lt;T&gt;&amp; operator=(const optional&amp; rhs);</tt>
 <br/><tab/><i>Effects:</i> See Table
 <blockquote><table border="1">
-<caption><ins>Table &mdash; <tt><i>alloc-optional</i> operator=(const <i>alloc-optional</i>&amp; rhs)</tt> effects</ins></caption>
+<caption><ins>Table &mdash; <tt>optional operator=(const optional&amp; rhs)</tt> effects</ins></caption>
 <tr>
 <th></th>
 <th><ins><tt>*this</tt> contains a value</ins></th>
@@ -1068,9 +1114,10 @@ no effect.
 <tr>
 <td><ins><tt>rhs</tt> contains a value</ins></td>
 <td><ins>assigns <tt>*rhs</tt> to the contained value</ins></td>
-<td><ins>initializes the contained value by uses-allocator construction
-with allocator <tt>polymorphic_allocator&lt;&gt;(_M_pmr)</tt> and
-<tt>*rhs</tt> as the constructor argument.</ins></td>
+<td><ins>initializes the contained value with <tt>*rhs</tt>. 
+If <tt>uses_allocator&lt;T, polymorphic_allocator&lt;&gt;&gt;</tt>
+ is <tt>true</tt>, initialization is done by uses-allocator construction 
+with allocator <tt><i>M_alloc</i></tt> </ins></td>
 </tr>
 <tr>
 <td><ins><tt>rhs</tt> does not contain a value</ins></td>
@@ -1081,18 +1128,18 @@ with allocator <tt>polymorphic_allocator&lt;&gt;(_M_pmr)</tt> and
 <br/><tab/><i>Returns:</i> <tt>*this</tt>.
 <br/><tab/><i>Ensures:</i> <tt>bool(rhs) == bool(*this)</tt>.
 <br/><tab/><i>Remarks:</i> If any exception is thrown, the result of the expression <tt>bool(*this)</tt> remains unchanged.
-If an exception is thrown during the call to <tt>T</tt>'s copy constructor, no effect. If an exception is thrown during the
+If an exception is thrown during the call to <tt>T</tt>'s copy constructor, no effect. If an exception is thrown during the 
 call to <tt>T</tt>'s copy assignment, the state of of its contained value is as defined by the exception safety guarantee of
 is determined by the exception safety guarantee of <tt>T</tt>'s copy assignment.
 This operator shall be defined as deleted unless <tt>is_­copy_­constructible_­v&lt;T&gt;</tt> is <tt>true</tt> and
- <tt>is_­copy_­assignable_­v&lt;T&gt;</tt> is <tt>true</tt>.
+<tt>is_­copy_­assignable_­v&lt;T&gt;</tt> is <tt>true</tt>. 
 
 <br/>
-<br/><tt><i>alloc-optional</i>&lt;T&gt;&amp; operator=(<i>alloc-optional</i>&amp;&amp; rhs) noexcept(<i>see below</i>);</tt>
+<br/><tt>optional&lt;T&gt;&amp; operator=(optional&amp;&amp; rhs) noexcept(<i>see below</i>);</tt>
 <br/><tab/><i>Effects:</i> See Table
 <blockquote>
 <table border="1">
-<caption><ins>Table &mdash; <tt><i>alloc-optional</i> operator=(<i>alloc-optional</i>&amp;&amp; rhs)</tt> effects</ins></caption>
+<caption><ins>Table &mdash; <tt>optional operator=(optional&amp;&amp; rhs)</tt> effects</ins></caption>
 <tr>
 <th></th>
 <th><ins><tt>*this</tt> contains a value</ins></th>
@@ -1101,8 +1148,10 @@ This operator shall be defined as deleted unless <tt>is_­copy_­constructible_�
 <tr>
 <td><ins><tt>rhs</tt> contains a value</ins></td>
 <td><ins>assigns <tt>std​::​move(*rhs)</tt> to the contained value</ins></td>
-<td><ins>initializes the contained value by uses-allocator construction
-with allocator <tt>polymorphic_allocator&lt;&gt;(_M_pmr)</tt> and <tt>std​::​move(*rhs)</tt> as the constructor argument.</ins></td>
+<td><ins>initializes the contained value with <tt>std​::​move(*rhs)</tt>. 
+If <tt>uses_allocator&lt;T, polymorphic_allocator&lt;&gt;&gt;</tt>
+ is <tt>true</tt>, initialization is done by uses-allocator construction 
+with allocator <tt><i>M_alloc</i></tt> </ins></td>
 </tr>
 <tr>
 <td><ins><tt>rhs</tt> does not contain a value</ins></td>
@@ -1123,10 +1172,11 @@ the state of <tt>*val</tt> and <tt>*rhs.val</tt> is determined by the exception 
 
 
 <br/>
-<br/><code>template&lt;class U = T&gt; <i>alloc-optional</i>&amp; operator=(U&amp;&amp; v);</code>
+<br/><code>template&lt;class U = T&gt; optional&amp; operator=(U&amp;&amp; v);</code>
 <br/><tab/><i>Effects:</i> If <tt>*this</tt> contains a value, assigns <tt>std​::​forward&lt;U&gt;(v)</tt> to the contained value;
-otherwise initializes the contained value by uses-allocator construction
-with allocator <tt>polymorphic_allocator&lt;&gt;(_M_pmr)</tt> and <tt>std​::​forward&lt;U&gt;(v)</tt> as the constructor argument.
+otherwise initializes the contained value with <tt>std​::​forward&lt;U&gt;(v)</tt>. If <tt>uses_allocator&lt;T, polymorphic_allocator&lt;&gt;&gt;</tt>
+ is <tt>true</tt>, initialization is done by uses-allocator construction
+with allocator <tt><i>M_alloc</i></tt>
 <br/><tab/><i>Returns:</i> <tt>*this</tt>.
 <br/><tab/><i>Ensures:</i> <tt>*this</tt> contains a value.
 <br/><tab/><i>Remarks: If any exception is thrown, the result of the expression <tt>bool(*this)</tt> remains unchanged.
@@ -1139,13 +1189,12 @@ the state of <tt>*val</tt> and <tt>v</tt> is determined by the exception safety 
 <br/><tab2/> - <tt>is_­constructible_­v&lt;T,U&gt;</tt> is <tt>true</tt>, and
 <br/><tab2/> - <tt>is_­assignable_­v&lt;T&amp;,U&gt;</tt> is <tt>true</tt>
 
-
 <br/>
-<br/><tt>template&lt;class U&gt; <i>alloc-optional</i>&amp; operator=(const <i>alloc-optional</i>&lt;U&gt;&amp; rhs);</tt>
+<br/><tt>template&lt;class U&gt; optional&amp; operator=(const optional&lt;U&gt;&amp; rhs);</tt>
 <br/><tab/><i>Effects:</i> See Table
 <blockquote>
 <table border="1">
-<caption><ins>Table &mdash; <tt><i>alloc-optional</i> operator=(const <i>alloc-optional</i>&lt;U&gt;&amp;)</tt> effects</ins></caption>
+<caption><ins>Table &mdash; <tt>optional operator=(const optional&lt;U&gt;&amp;)</tt> effects</ins></caption>
 <tr>
 <th></th>
 <th><ins><tt>*this</tt> contains a value</ins></th>
@@ -1154,8 +1203,10 @@ the state of <tt>*val</tt> and <tt>v</tt> is determined by the exception safety 
 <tr>
 <td><ins><tt>rhs</tt> contains a value</ins></td>
 <td><ins>assigns <tt>*rhs</tt> to the contained value</ins></td>
-<td><ins>initializes the contained value by uses-allocator construction
-with allocator <tt>polymorphic_allocator&lt;&gt;(_M_pmr)</tt> and <tt>*rhs</tt> as the constructor argument.</ins></td>
+<td><ins>initializes the contained value with <tt>*rhs</tt>.
+If <tt>uses_allocator&lt;T, polymorphic_allocator&lt;&gt;&gt;</tt>
+ is <tt>true</tt>, initialization is done by uses-allocator construction 
+with allocator <tt><i>M_alloc</i></tt> </ins></td>
 </tr>
 <tr>
 <td><ins><tt>rhs</tt> does not contain a value</ins></td>
@@ -1173,37 +1224,37 @@ to <tt>T</tt>'s assignment, the state of <tt>*val</tt>  is determined by the exc
 <br/><tab2/> - <tt>is_­constructible_­v&lt;T, const U&amp;&gt;</tt> is <tt>true</tt>,
 <br/><tab2/> - <tt>is_assignable&lt;T&amp;, const U&amp;&gt;</tt> is <tt>true</tt>,
 <br/><tab2/> - <tt>is_­constructible_­v&lt;T, std::optional&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>,
-<br/><tab2/> - <tt>is_­constructible_­v&lt;T, <i>alloc-optional</i>&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>,
+<br/><tab2/> - <tt>is_­constructible_­v&lt;T, optional&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>,
 <br/><tab2/> - <tt>is_­constructible_­v&lt;T, std::optional&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>,
-<br/><tab2/> - <tt>is_­constructible_­v&lt;T, <i>alloc-optional</i>&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>,
+<br/><tab2/> - <tt>is_­constructible_­v&lt;T, optional&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>,
 <br/><tab2/> - <tt>is_­constructible_­v&lt;T, const std::optional&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>,
-<br/><tab2/> - <tt>is_­constructible_­v&lt;T, const <i>alloc-optional</i>&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>,
+<br/><tab2/> - <tt>is_­constructible_­v&lt;T, const optional&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>,
 <br/><tab2/> - <tt>is_­constructible_­v&lt;T, const std::optional&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>,
-<br/><tab2/> - <tt>is_­constructible_­v&lt;T, const <i>alloc-optional</i>&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>,
+<br/><tab2/> - <tt>is_­constructible_­v&lt;T, const optional&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>,
 <br/><tab2/> - <tt>is_­convertible_­v&lt;std::optional&lt;U&gt;&amp;, T&gt;</tt> is <tt>false</tt>,
-<br/><tab2/> - <tt>is_­convertible_­v&lt;<i>alloc-optional</i>&lt;U&gt;&amp;, T&gt;</tt> is <tt>false</tt>,
+<br/><tab2/> - <tt>is_­convertible_­v&lt;optional&lt;U&gt;&amp;, T&gt;</tt> is <tt>false</tt>,
 <br/><tab2/> - <tt>is_­convertible_­v&lt;std::optional&lt;U&gt;&amp;&amp;, T&gt;</tt> is <tt>false</tt>,
-<br/><tab2/> - <tt>is_­convertible_­v&lt;<i>alloc-optional</i>&lt;U&gt;&amp;&amp;, T&gt;</tt> is <tt>false</tt>,
+<br/><tab2/> - <tt>is_­convertible_­v&lt;optional&lt;U&gt;&amp;&amp;, T&gt;</tt> is <tt>false</tt>,
 <br/><tab2/> - <tt>is_­convertible_­v&lt;const std::optional&lt;U&gt;&amp;, T&gt;</tt> is <tt>false</tt>,
-<br/><tab2/> - <tt>is_­convertible_­v&lt;const <i>alloc-optional</i>&lt;U&gt;&amp;, T&gt;</tt> is <tt>false</tt>,
+<br/><tab2/> - <tt>is_­convertible_­v&lt;const optional&lt;U&gt;&amp;, T&gt;</tt> is <tt>false</tt>,
 <br/><tab2/> - <tt>is_­convertible_­v&lt;const std::optional&lt;U&gt;&amp;&amp;, T&gt;</tt> is <tt>false</tt>,
-<br/><tab2/> - <tt>is_­convertible_­v&lt;const <i>alloc-optional</i>&lt;U&gt;&amp;&amp;, T&gt;</tt> is <tt>false</tt>,
+<br/><tab2/> - <tt>is_­convertible_­v&lt;const optional&lt;U&gt;&amp;&amp;, T&gt;</tt> is <tt>false</tt>,
 <br/><tab2/> - <tt>is_assignable_v&lt;T&amp;, std::optional&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>,
-<br/><tab2/> - <tt>is_assignable_v&lt;T&amp;, <i>alloc-optional</i>&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>,
+<br/><tab2/> - <tt>is_assignable_v&lt;T&amp;, optional&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>,
 <br/><tab2/> - <tt>is_assignable_v&lt;T&amp;, std::optional&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>,
-<br/><tab2/> - <tt>is_assignable_v&lt;T&amp;, <i>alloc-optional</i>&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>,
+<br/><tab2/> - <tt>is_assignable_v&lt;T&amp;, optional&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>,
 <br/><tab2/> - <tt>is_assignable_v&lt;T&amp;, const std::optional&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>,
-<br/><tab2/> - <tt>is_assignable_v&lt;T&amp;, const <i>alloc-optional</i>&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>,
+<br/><tab2/> - <tt>is_assignable_v&lt;T&amp;, const optional&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>,
 <br/><tab2/> - <tt>is_assignable_v&lt;T&amp;, const std::optional&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>, and
-<br/><tab2/> - <tt>is_assignable_v&lt;T&amp;, const <i>alloc-optional</i>&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>
+<br/><tab2/> - <tt>is_assignable_v&lt;T&amp;, const optional&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>
 
 
 <br/>
-<br/><tt>template&lt;class U&gt; <i>alloc-optional</i>&amp; operator=(const std::optional&lt;U&gt;&amp; rhs);</tt>
+<br/><tt>template&lt;class U&gt; optional&amp; operator=(const std::optional&lt;U&gt;&amp; rhs);</tt>
 <br/><tab/><i>Effects:</i> The result of the expression <tt>bool(rhs)</tt> remains unchanged. See Table
 <blockquote>
 <table border="1">
-<caption><ins>Table &mdash; <tt><i>alloc-optional</i> operator=(const std::optional&lt;U&gt;&amp;)</tt> effects</ins></caption>
+<caption><ins>Table &mdash; <tt>optional operator=(const std::optional&lt;U&gt;&amp;)</tt> effects</ins></caption>
 <tr>
 <th></th>
 <th><ins><tt>*this</tt> contains a value</ins></th>
@@ -1212,8 +1263,10 @@ to <tt>T</tt>'s assignment, the state of <tt>*val</tt>  is determined by the exc
 <tr>
 <td><ins><tt>rhs</tt> contains a value</ins></td>
 <td><ins>assigns <tt> std​::​move(*rhs)</tt> to the contained value</ins></td>
-<td><ins>initializes the contained value by uses-allocator construction
-with allocator <tt>polymorphic_allocator&lt;&gt;(_M_pmr)</tt> and <tt> std​::​move(*rhs)</tt> as the constructor argument.</ins></td>
+<td><ins>initializes the contained value with <tt> std​::​move(*rhs)</tt>.
+If <tt>uses_allocator&lt;T, polymorphic_allocator&lt;&gt;&gt;</tt>
+ is <tt>true</tt>, initialization is done by uses-allocator construction 
+with allocator <tt><i>M_alloc</i></tt>.</ins></td>
 </tr>
 <tr>
 <td><ins><tt>rhs</tt> does not contain a value</ins></td>
@@ -1230,37 +1283,37 @@ to <tt>T</tt>'s assignment, the state of <tt>*val</tt>  is determined by the exc
 <br/><tab2/> - <tt>is_­constructible_­v&lt;T, U&gt;</tt> is <tt>true</tt>,
 <br/><tab2/> - <tt>is_assignable&lt;T&amp;, U&gt;</tt> is <tt>true</tt>,
 <br/><tab2/> - <tt>is_­constructible_­v&lt;T, std::optional&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>,
-<br/><tab2/> - <tt>is_­constructible_­v&lt;T, <i>alloc-optional</i>&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>,
+<br/><tab2/> - <tt>is_­constructible_­v&lt;T, optional&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>,
 <br/><tab2/> - <tt>is_­constructible_­v&lt;T, std::optional&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>,
-<br/><tab2/> - <tt>is_­constructible_­v&lt;T, <i>alloc-optional</i>&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>,
+<br/><tab2/> - <tt>is_­constructible_­v&lt;T, optional&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>,
 <br/><tab2/> - <tt>is_­constructible_­v&lt;T, const std::optional&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>,
-<br/><tab2/> - <tt>is_­constructible_­v&lt;T, const <i>alloc-optional</i>&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>,
+<br/><tab2/> - <tt>is_­constructible_­v&lt;T, const optional&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>,
 <br/><tab2/> - <tt>is_­constructible_­v&lt;T, const std::optional&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>,
-<br/><tab2/> - <tt>is_­constructible_­v&lt;T, const <i>alloc-optional</i>&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>,
+<br/><tab2/> - <tt>is_­constructible_­v&lt;T, const optional&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>,
 <br/><tab2/> - <tt>is_­convertible_­v&lt;std::optional&lt;U&gt;&amp;, T&gt;</tt> is <tt>false</tt>,
-<br/><tab2/> - <tt>is_­convertible_­v&lt;<i>alloc-optional</i>&lt;U&gt;&amp;, T&gt;</tt> is <tt>false</tt>,
+<br/><tab2/> - <tt>is_­convertible_­v&lt;optional&lt;U&gt;&amp;, T&gt;</tt> is <tt>false</tt>,
 <br/><tab2/> - <tt>is_­convertible_­v&lt;std::optional&lt;U&gt;&amp;&amp;, T&gt;</tt> is <tt>false</tt>,
-<br/><tab2/> - <tt>is_­convertible_­v&lt;<i>alloc-optional</i>&lt;U&gt;&amp;&amp;, T&gt;</tt> is <tt>false</tt>,
+<br/><tab2/> - <tt>is_­convertible_­v&lt;optional&lt;U&gt;&amp;&amp;, T&gt;</tt> is <tt>false</tt>,
 <br/><tab2/> - <tt>is_­convertible_­v&lt;const std::optional&lt;U&gt;&amp;, T&gt;</tt> is <tt>false</tt>,
-<br/><tab2/> - <tt>is_­convertible_­v&lt;const <i>alloc-optional</i>&lt;U&gt;&amp;, T&gt;</tt> is <tt>false</tt>,
+<br/><tab2/> - <tt>is_­convertible_­v&lt;const optional&lt;U&gt;&amp;, T&gt;</tt> is <tt>false</tt>,
 <br/><tab2/> - <tt>is_­convertible_­v&lt;const std::optional&lt;U&gt;&amp;&amp;, T&gt;</tt> is <tt>false</tt>,
-<br/><tab2/> - <tt>is_­convertible_­v&lt;const <i>alloc-optional</i>&lt;U&gt;&amp;&amp;, T&gt;</tt> is <tt>false</tt>,
+<br/><tab2/> - <tt>is_­convertible_­v&lt;const optional&lt;U&gt;&amp;&amp;, T&gt;</tt> is <tt>false</tt>,
 <br/><tab2/> - <tt>is_assignable_v&lt;T&amp;, std::optional&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>,
-<br/><tab2/> - <tt>is_assignable_v&lt;T&amp;, <i>alloc-optional</i>&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>,
+<br/><tab2/> - <tt>is_assignable_v&lt;T&amp;, optional&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>,
 <br/><tab2/> - <tt>is_assignable_v&lt;T&amp;, std::optional&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>,
-<br/><tab2/> - <tt>is_assignable_v&lt;T&amp;, <i>alloc-optional</i>&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>,
+<br/><tab2/> - <tt>is_assignable_v&lt;T&amp;, optional&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>,
 <br/><tab2/> - <tt>is_assignable_v&lt;T&amp;, const std::optional&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>,
-<br/><tab2/> - <tt>is_assignable_v&lt;T&amp;, const <i>alloc-optional</i>&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>,
+<br/><tab2/> - <tt>is_assignable_v&lt;T&amp;, const optional&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>,
 <br/><tab2/> - <tt>is_assignable_v&lt;T&amp;, const std::optional&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>, and
-<br/><tab2/> - <tt>is_assignable_v&lt;T&amp;, const <i>alloc-optional</i>&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>
+<br/><tab2/> - <tt>is_assignable_v&lt;T&amp;, const optional&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>
 
 
 <br/>
-<br/><tt>template&lt;class U&gt; <i>alloc-optional</i>&amp; operator=(<i>alloc-optional</i>&lt;U&gt;&amp;&amp; rhs);</tt>
+<br/><tt>template&lt;class U&gt; optional&amp; operator=(optional&lt;U&gt;&amp;&amp; rhs);</tt>
 <br/><tab/><i>Effects:</i> See Table
 <blockquote>
 <table border="1">
-<caption><ins>Table &mdash; <tt><i>alloc-optional</i> operator=(<i>alloc-optional</i>&lt;U&gt;&amp;&amp;)</tt> effects</ins></caption>
+<caption><ins>Table &mdash; <tt>optional operator=(optional&lt;U&gt;&amp;&amp;)</tt> effects</ins></caption>
 <tr>
 <th></th>
 <th><ins><tt>*this</tt> contains a value</ins></th>
@@ -1269,8 +1322,10 @@ to <tt>T</tt>'s assignment, the state of <tt>*val</tt>  is determined by the exc
 <tr>
 <td><ins><tt>rhs</tt> contains a value</ins></td>
 <td><ins>assigns <tt>*rhs</tt> to the contained value</ins></td>
-<td><ins>initializes the contained value by uses-allocator construction
-with allocator <tt>polymorphic_allocator&lt;&gt;(_M_pmr)</tt> and <tt>*rhs</tt> as the constructor argument.</ins></td>
+<td><ins>initializes the contained value with <tt>*rhs</tt>.
+If <tt>uses_allocator&lt;T, polymorphic_allocator&lt;&gt;&gt;</tt>
+ is <tt>true</tt>, initialization is done by uses-allocator construction 
+with allocator <tt><i>M_alloc</i></tt> .</ins></td>
 </tr>
 <tr>
 <td><ins><tt>rhs</tt> does not contain a value</ins></td>
@@ -1289,37 +1344,37 @@ the state of <tt>*val</tt> and <tt>*rhs.val</tt> is determined by the exception 
 <br/><tab2/> - <tt>is_­constructible_­v&lt;T, const U&amp;&gt;</tt> is <tt>true</tt>,
 <br/><tab2/> - <tt>is_assignable&lt;T&amp;, const U&amp;&gt;</tt> is <tt>true</tt>,
 <br/><tab2/> - <tt>is_­constructible_­v&lt;T, std::optional&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>,
-<br/><tab2/> - <tt>is_­constructible_­v&lt;T, <i>alloc-optional</i>&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>,
+<br/><tab2/> - <tt>is_­constructible_­v&lt;T, optional&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>,
 <br/><tab2/> - <tt>is_­constructible_­v&lt;T, std::optional&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>,
-<br/><tab2/> - <tt>is_­constructible_­v&lt;T, <i>alloc-optional</i>&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>,
+<br/><tab2/> - <tt>is_­constructible_­v&lt;T, optional&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>,
 <br/><tab2/> - <tt>is_­constructible_­v&lt;T, const std::optional&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>,
-<br/><tab2/> - <tt>is_­constructible_­v&lt;T, const <i>alloc-optional</i>&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>,
+<br/><tab2/> - <tt>is_­constructible_­v&lt;T, const optional&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>,
 <br/><tab2/> - <tt>is_­constructible_­v&lt;T, const std::optional&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>,
-<br/><tab2/> - <tt>is_­constructible_­v&lt;T, const <i>alloc-optional</i>&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>,
+<br/><tab2/> - <tt>is_­constructible_­v&lt;T, const optional&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>,
 <br/><tab2/> - <tt>is_­convertible_­v&lt;const U&amp;, T&gt;</tt> is <tt>true</tt>,
 <br/><tab2/> - <tt>is_­convertible_­v&lt;std::optional&lt;U&gt;&amp;, T&gt;</tt> is <tt>false</tt>,
-<br/><tab2/> - <tt>is_­convertible_­v&lt;<i>alloc-optional</i>&lt;U&gt;&amp;, T&gt;</tt> is <tt>false</tt>,
+<br/><tab2/> - <tt>is_­convertible_­v&lt;optional&lt;U&gt;&amp;, T&gt;</tt> is <tt>false</tt>,
 <br/><tab2/> - <tt>is_­convertible_­v&lt;std::optional&lt;U&gt;&amp;&amp;, T&gt;</tt> is <tt>false</tt>,
-<br/><tab2/> - <tt>is_­convertible_­v&lt;<i>alloc-optional</i>&lt;U&gt;&amp;&amp;, T&gt;</tt> is <tt>false</tt>,
+<br/><tab2/> - <tt>is_­convertible_­v&lt;optional&lt;U&gt;&amp;&amp;, T&gt;</tt> is <tt>false</tt>,
 <br/><tab2/> - <tt>is_­convertible_­v&lt;const std::optional&lt;U&gt;&amp;, T&gt;</tt> is <tt>false</tt>,
-<br/><tab2/> - <tt>is_­convertible_­v&lt;const <i>alloc-optional</i>&lt;U&gt;&amp;, T&gt;</tt> is <tt>false</tt>,
+<br/><tab2/> - <tt>is_­convertible_­v&lt;const optional&lt;U&gt;&amp;, T&gt;</tt> is <tt>false</tt>,
 <br/><tab2/> - <tt>is_­convertible_­v&lt;const std::optional&lt;U&gt;&amp;&amp;, T&gt;</tt> is <tt>false</tt>,
-<br/><tab2/> - <tt>is_­convertible_­v&lt;const <i>alloc-optional</i>&lt;U&gt;&amp;&amp;, T&gt;</tt> is <tt>false</tt>,
+<br/><tab2/> - <tt>is_­convertible_­v&lt;const optional&lt;U&gt;&amp;&amp;, T&gt;</tt> is <tt>false</tt>,
 <br/><tab2/> - <tt>is_assignable_v&lt;T&amp;, std::optional&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>,
-<br/><tab2/> - <tt>is_assignable_v&lt;T&amp;, <i>alloc-optional</i>&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>,
+<br/><tab2/> - <tt>is_assignable_v&lt;T&amp;, optional&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>,
 <br/><tab2/> - <tt>is_assignable_v&lt;T&amp;, std::optional&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>,
-<br/><tab2/> - <tt>is_assignable_v&lt;T&amp;, <i>alloc-optional</i>&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>,
+<br/><tab2/> - <tt>is_assignable_v&lt;T&amp;, optional&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>,
 <br/><tab2/> - <tt>is_assignable_v&lt;T&amp;, const std::optional&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>,
-<br/><tab2/> - <tt>is_assignable_v&lt;T&amp;, const <i>alloc-optional</i>&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>,
+<br/><tab2/> - <tt>is_assignable_v&lt;T&amp;, const optional&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>,
 <br/><tab2/> - <tt>is_assignable_v&lt;T&amp;, const std::optional&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>, and
-<br/><tab2/> - <tt>is_assignable_v&lt;T&amp;, const <i>alloc-optional</i>&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>
+<br/><tab2/> - <tt>is_assignable_v&lt;T&amp;, const optional&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>
 
 <br/>
-<br/><tt>template&lt;class U&gt; <i>alloc-optional</i>&amp; operator=(std::optional&lt;U&gt;&amp;&amp; rhs);</tt>
+<br/><tt>template&lt;class U&gt; optional&amp; operator=(std::optional&lt;U&gt;&amp;&amp; rhs);</tt>
 <br/><tab/><i>Effects:</i> See Table
 <blockquote>
 <table border="1">
-<caption><ins>Table &mdash; <tt><i>alloc-optional</i> operator=(std::optional&lt;U&gt;&amp;&amp;)</tt> effects</ins></caption>
+<caption><ins>Table &mdash; <tt>optional operator=(std::optional&lt;U&gt;&amp;&amp;)</tt> effects</ins></caption>
 <tr>
 <th></th>
 <th><ins><tt>*this</tt> contains a value</ins></th>
@@ -1328,8 +1383,10 @@ the state of <tt>*val</tt> and <tt>*rhs.val</tt> is determined by the exception 
 <tr>
 <td><ins><tt>rhs</tt> contains a value</ins></td>
 <td><ins>assigns <tt>*rhs</tt> to the contained value</ins></td>
-<td><ins>initializes the contained value by uses-allocator construction
-with allocator <tt>polymorphic_allocator&lt;&gt;(_M_pmr)</tt> and <tt>*rhs</tt> as the constructor argument.</ins></td>
+<td><ins>initializes the contained value with <tt>*rhs</tt>.
+If <tt>uses_allocator&lt;T, polymorphic_allocator&lt;&gt;&gt;</tt>
+ is <tt>true</tt>, initialization is done by uses-allocator construction 
+with allocator <tt><i>M_alloc</i></tt> </ins></td>
 </tr>
 <tr>
 <td><ins><tt>rhs</tt> does not contain a value</ins></td>
@@ -1347,38 +1404,39 @@ the state of <tt>*val</tt> and <tt>*rhs.val</tt> is determined by the exception 
 <br/><tab2/> - <tt>is_­constructible_­v&lt;T, const U&amp;&gt;</tt> is <tt>true</tt>,
 <br/><tab2/> - <tt>is_assignable&lt;T&amp;, const U&amp;&gt;</tt> is <tt>true</tt>,
 <br/><tab2/> - <tt>is_­constructible_­v&lt;T, std::optional&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>,
-<br/><tab2/> - <tt>is_­constructible_­v&lt;T, <i>alloc-optional</i>&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>,
+<br/><tab2/> - <tt>is_­constructible_­v&lt;T, optional&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>,
 <br/><tab2/> - <tt>is_­constructible_­v&lt;T, std::optional&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>,
-<br/><tab2/> - <tt>is_­constructible_­v&lt;T, <i>alloc-optional</i>&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>,
+<br/><tab2/> - <tt>is_­constructible_­v&lt;T, optional&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>,
 <br/><tab2/> - <tt>is_­constructible_­v&lt;T, const std::optional&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>,
-<br/><tab2/> - <tt>is_­constructible_­v&lt;T, const <i>alloc-optional</i>&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>,
+<br/><tab2/> - <tt>is_­constructible_­v&lt;T, const optional&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>,
 <br/><tab2/> - <tt>is_­constructible_­v&lt;T, const std::optional&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>,
-<br/><tab2/> - <tt>is_­constructible_­v&lt;T, const <i>alloc-optional</i>&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>,
+<br/><tab2/> - <tt>is_­constructible_­v&lt;T, const optional&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>,
 <br/><tab2/> - <tt>is_­convertible_­v&lt;const U&amp;, T&gt;</tt> is <tt>true</tt>,
 <br/><tab2/> - <tt>is_­convertible_­v&lt;std::optional&lt;U&gt;&amp;, T&gt;</tt> is <tt>false</tt>,
-<br/><tab2/> - <tt>is_­convertible_­v&lt;<i>alloc-optional</i>&lt;U&gt;&amp;, T&gt;</tt> is <tt>false</tt>,
+<br/><tab2/> - <tt>is_­convertible_­v&lt;optional&lt;U&gt;&amp;, T&gt;</tt> is <tt>false</tt>,
 <br/><tab2/> - <tt>is_­convertible_­v&lt;std::optional&lt;U&gt;&amp;&amp;, T&gt;</tt> is <tt>false</tt>,
-<br/><tab2/> - <tt>is_­convertible_­v&lt;<i>alloc-optional</i>&lt;U&gt;&amp;&amp;, T&gt;</tt> is <tt>false</tt>,
+<br/><tab2/> - <tt>is_­convertible_­v&lt;optional&lt;U&gt;&amp;&amp;, T&gt;</tt> is <tt>false</tt>,
 <br/><tab2/> - <tt>is_­convertible_­v&lt;const std::optional&lt;U&gt;&amp;, T&gt;</tt> is <tt>false</tt>,
-<br/><tab2/> - <tt>is_­convertible_­v&lt;const <i>alloc-optional</i>&lt;U&gt;&amp;, T&gt;</tt> is <tt>false</tt>,
+<br/><tab2/> - <tt>is_­convertible_­v&lt;const optional&lt;U&gt;&amp;, T&gt;</tt> is <tt>false</tt>,
 <br/><tab2/> - <tt>is_­convertible_­v&lt;const std::optional&lt;U&gt;&amp;&amp;, T&gt;</tt> is <tt>false</tt>,
-<br/><tab2/> - <tt>is_­convertible_­v&lt;const <i>alloc-optional</i>&lt;U&gt;&amp;&amp;, T&gt;</tt> is <tt>false</tt>,
+<br/><tab2/> - <tt>is_­convertible_­v&lt;const optional&lt;U&gt;&amp;&amp;, T&gt;</tt> is <tt>false</tt>,
 <br/><tab2/> - <tt>is_assignable_v&lt;T&amp;, std::optional&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>,
-<br/><tab2/> - <tt>is_assignable_v&lt;T&amp;, <i>alloc-optional</i>&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>,
+<br/><tab2/> - <tt>is_assignable_v&lt;T&amp;, optional&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>,
 <br/><tab2/> - <tt>is_assignable_v&lt;T&amp;, std::optional&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>,
-<br/><tab2/> - <tt>is_assignable_v&lt;T&amp;, <i>alloc-optional</i>&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>,
+<br/><tab2/> - <tt>is_assignable_v&lt;T&amp;, optional&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>,
 <br/><tab2/> - <tt>is_assignable_v&lt;T&amp;, const std::optional&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>,
-<br/><tab2/> - <tt>is_assignable_v&lt;T&amp;, const <i>alloc-optional</i>&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>,
+<br/><tab2/> - <tt>is_assignable_v&lt;T&amp;, const optional&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>,
 <br/><tab2/> - <tt>is_assignable_v&lt;T&amp;, const std::optional&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>, and
-<br/><tab2/> - <tt>is_assignable_v&lt;T&amp;, const <i>alloc-optional</i>&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>
+<br/><tab2/> - <tt>is_assignable_v&lt;T&amp;, const optional&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>
 
 
 <br/>
 <br/><code>  template&lt;class... Args&gt;> T&amp; emplace(Args&amp;&amp;...);</code>
 <br/><tab/><i>Constraints:</i> <tt>is_­constructible_­v&lt;T, Args&amp;&amp;...&gt; </tt>is true.
-<br/><tab/><i>Effects:</i> Calls <tt>*this = nullopt</tt>. Then initializes the contained value
-by uses-allocator construction
-with allocator <tt>polymorphic_allocator&lt;&gt;(_M_pmr)</tt> and <tt>std​::​forward&lt;Args&gt;(args)....</tt> as the constructor argument.
+<br/><tab/><i>Effects:</i> Calls <tt>*this = nullopt</tt>. Then initializes the contained value 
+with <tt>std​::​forward&lt;Args&gt;(args)....</tt>. If <tt>uses_allocator&lt;T, polymorphic_allocator&lt;&gt;&gt;</tt>
+ is <tt>true</tt>, initialization is done by uses-allocator construction 
+with allocator <tt><i>M_alloc</i></tt>.
 <br/><tab/><i>Ensures:</i> <tt>*this</tt> contains a value.
 <br/><tab/><i>Returns:</i> A reference to the new contained value.
 <br/><tab/><i>Throws:</i> Any exception thrown by the selected constructor of <tt>T</tt>.
@@ -1389,9 +1447,10 @@ with allocator <tt>polymorphic_allocator&lt;&gt;(_M_pmr)</tt> and <tt>std​::�
 <br/>
 <br/><code>    template&lt;class U, class... Args&gt; T&amp; emplace(initializer_list&lt;U&gt;, Args&amp;&amp;...);</code>
 <br/><tab/><i>Constraints:</i> <tt>is_­constructible_­v&lt;T, initializer_­list&lt;U&gt;&amp;, Args&amp;&amp;...&gt; </tt>is true.
-<br/><tab/><i>Effects:</i> Calls <tt>*this = nullopt</tt>. Then initializes the contained value
-by uses-allocator construction
-with allocator <tt>polymorphic_allocator&lt;&gt;(_M_pmr)</tt> and <tt>il, std​::​forward&lt;Args&gt;(args)....</tt> as the constructor arguments.
+<br/><tab/><i>Effects:</i> Calls <tt>*this = nullopt</tt>. Then initializes the contained value 
+with <tt>il</tt> and <tt> std​::​forward&lt;Args&gt;(args)....</tt>. If <tt>uses_allocator&lt;T, polymorphic_allocator&lt;&gt;&gt;</tt>
+ is <tt>true</tt>, initialization is done by uses-allocator construction 
+with allocator <tt><i>M_alloc</i></tt>.
 <br/><tab/><i>Ensures:</i> <tt>*this</tt> contains a value.
 <br/><tab/><i>Returns:</i> A reference to the new contained value.
 <br/><tab/><i>Throws:</i> Any exception thrown by the selected constructor of <tt>T</tt>.
@@ -1400,15 +1459,16 @@ with allocator <tt>polymorphic_allocator&lt;&gt;(_M_pmr)</tt> and <tt>il, std​
 </ins></blockquote>
 
 
-<p><h4><ins> Swap [<i>alloc-optional</i>.swap]</ins></h4></p>
+<p><h4><ins> Swap [pmroptional.swap]</ins></h4></p>
 <blockquote><ins>
 
-<br/><tt>void swap(<i>alloc-optional</i>&amp; rhs);</tt>
+<br/><tt>void swap(optional&amp; rhs);</tt>
 <br/><tab/><i>Constraints:</i> Lvalues of type <tt>T</tt> shall be swappable and <tt>is_­move_­constructible_­v&lt;T&gt;</tt> is <tt>true</tt>.
-<br/><tab/><i>Expects:</i> <tt>a.get_allocator() == b.get_allocator()</tt>.
+<br/><tab/><i>Expects:</i>If <tt>uses_allocator&lt;T, polymorphic_allocator&lt;&gt;&gt;</tt>
+ is <tt>true</tt>, <tt>a.get_allocator() == b.get_allocator()</tt>.
 <br/><tab/><i>Effects:</i> See Table x
 <blockquote><table border="1">
-<caption><ins>Table x &mdash; <tt>swap(<i>alloc-optional</i>&amp;)</tt> effects</ins></caption>
+<caption><ins>Table x &mdash; <tt>swap(optional&amp;)</tt> effects</ins></caption>
 <tr>
 <th></th>
 <th><ins><tt>*this</tt> contains a value</ins></th>
@@ -1417,17 +1477,21 @@ with allocator <tt>polymorphic_allocator&lt;&gt;(_M_pmr)</tt> and <tt>il, std​
 <tr>
 <td><ins><tt>rhs</tt> contains a value</ins></td>
 <td><ins>calls <tt>swap(*(*this), *rhs)</tt></ins></td>
-<td><ins>initializes the contained value by uses-allocator construction
-with allocator <tt>polymorphic_allocator&lt;&gt;(_M_pmr)</tt> and
+<td><ins>initializes the contained value with
 <tt>std​::​move(*rhs)</tt> as the constructor argument, followed by <tt>rhs.val->T​::​~T()</tt>;
-postcondition is that <tt>*this</tt> contains a value and <tt>rhs</tt> does not contain a value</ins></td>
+If <tt>uses_allocator&lt;T, polymorphic_allocator&lt;&gt;&gt;</tt>
+ is <tt>true</tt>, initialization is done by uses-allocator construction 
+with allocator <tt><i>M_alloc</i></tt>.
+Postcondition is that <tt>*this</tt> contains a value and <tt>rhs</tt> does not contain a value</ins></td>
 </tr>
 <tr>
 <td><ins><tt>rhs</tt> does not contain a value</ins></td>
-<td><ins>initializes the contained value by uses-allocator construction
-with allocator <tt>polymorphic_allocator&lt;&gt;(_M_pmr)</tt> and
-<tt>std​::​move(*(*this))</tt> as the constructor argument, followed by <tt>val->T​::​~T()</tt>;
-postcondition is that <tt>*this</tt> does not contain a value and <tt>rhs</tt> contains a value</ins></tt></ins></td>
+<td><ins>initializes the contained value with
+<tt>std​::​move(*(*this))</tt> as the constructor argument, followed by <tt>val->T​::​~T()</tt>; 
+If <tt>uses_allocator&lt;T, polymorphic_allocator&lt;&gt;&gt;</tt>
+ is <tt>true</tt>, initialization is done by uses-allocator construction 
+with allocator <tt><i>M_alloc</i></tt>.
+Postcondition is that <tt>*this</tt> does not contain a value and <tt>rhs</tt> contains a value</ins></tt></ins></td>
 <td><ins>no effect</ins></td>
 </tr>
 </table></blockquote>
@@ -1435,7 +1499,7 @@ postcondition is that <tt>*this</tt> does not contain a value and <tt>rhs</tt> c
 </ins></blockquote>
 
 
-<p><h4><ins> Observers [<i>alloc-optional</i>.observe]</ins></h4></p>
+<p><h4><ins> Observers [pmroptional.observe]</ins></h4></p>
 <blockquote><ins>
 
 
@@ -1480,7 +1544,7 @@ postcondition is that <tt>*this</tt> does not contain a value and <tt>rhs</tt> c
 <br/><tab2/><tt>return bool(*this) ? std::move(*val) : throw bad_optional_access();</tt>
 
 <br/>
-<br/><tt>template&lt;class U&gt; T value_or(U&amp;&amp;) const&amp;;</tt>
+<br/><tt>template&lt;class U&gt; T value_or(U&amp;&amp; v) const&amp;;</tt>
 <br/><tab/><i>Effects:</i> Equivalent to:
 <br/><tab2/><tt>return bool(*this) ? **this : static_cast&lt;T&gt;(std::forward&lt;U&gt;(v));</tt>
 <br/><tab/><i>Remarks:</i> If <tt>is_­copy_­constructible_­v&lt;T&gt;
@@ -1488,7 +1552,7 @@ postcondition is that <tt>*this</tt> does not contain a value and <tt>rhs</tt> c
 the program is ill-formed.
 
 <br/>
-<br/><tt>template&lt;class U&gt; T value_or(U&amp;&amp;) &amp;&amp;;</tt>
+<br/><tt>template&lt;class U&gt; T value_or(U&amp;&amp; v) &amp;&amp;;</tt>
 <br/><tab/><i>Effects:</i> Equivalent to:
 <br/><tab2/><tt>return bool(*this) ? std::move(**this) : static_cast&lt;T&gt;(std::forward&lt;U&gt;(v));</tt>
 <br/><tab/><i>Remarks:</i> If <tt>is_­move_­constructible_­v&lt;T&gt;
@@ -1497,7 +1561,8 @@ the program is ill-formed.
 
 
 <br/>
-<br/><tt>    template&lt;class U&gt; T value_or(allocator_arg_t, const polymorphic_allocator&lt;&gt;&amp; a, U&amp;&amp;) const&amp;;</tt>tt>
+<br/><tt>    template&lt;class U&gt; T value_or(allocator_arg_t, const polymorphic_allocator&lt;&gt;&amp; a, U&amp;&amp; v) const&amp;;</tt>tt>
+<br/><tab/><i>Constraints:</i> <tt>uses_allocator&lt;T,polymorphic_allocator&lt;&gt;&gt;</tt> is true;
 <br/><tab/><i>Effects:</i> if <tt>*this</tt> contains a value, returns an object of type <tt>T</tt> initialized by
 uses-allocator construction with allocator <tt>a</tt> and <tt>**this</tt> as the constructor argument.
 Otherwise, returns an object of type <tt>T</tt> initialized by
@@ -1507,7 +1572,8 @@ uses-allocator construction with allocator <tt>a</tt> and <tt>std::forward&lt;U&
 the program is ill-formed.
 
 <br/>
-<br/><tt>    template&lt;class U&gt; T value_or(allocator_arg_t, const polymorphic_allocator&lt;&gt;&amp;, U&amp;&amp;) &amp;&amp;;</tt>
+<br/><tt>    template&lt;class U&gt; T value_or(allocator_arg_t, const polymorphic_allocator&lt;&gt;&amp; a, U&amp;&amp; v) &amp;&amp;;</tt>
+<br/><tab/><i>Constraints:</i> <tt>uses_allocator&lt;T,polymorphic_allocator&lt;&gt;&gt;</tt> is true;
 <br/><tab/><i>Effects:</i> if <tt>*this</tt> contains a value, returns an object of type <tt>T</tt> initialized by
 uses-allocator construction with allocator <tt>a</tt> and <tt>std::move(**this)</tt> as the constructor argument.
 Otherwise, returns an object of type <tt>T</tt> initialized by
@@ -1518,104 +1584,124 @@ the program is ill-formed.
 
 <br/>
 <br/><tt>allocator_type get_allocator() const noexcept;</tt>
-<br/><tab/><i>Returns:</i> <tt>pmr::polymorphic_allocator&lt;&gt;(M_pmr)</tt>.
+<br/><tab/><i>Constraints:</i> <tt>uses_allocator&lt;T,polymorphic_allocator&lt;&gt;&gt;</tt> is true;
+<br/><tab/><i>Returns:</i> <tt><i>M_alloc</i></tt>.
 <br/><tab/><i>Throws:</i> nothing.
 
 
 </ins></blockquote>
 
 
-<p><h4><ins> Modifiers [<i>alloc-optional</i>.mod]</ins></h4></p>
+<p><h4><ins> Modifiers [pmroptional.mod]</ins></h4></p>
 <blockquote><ins>
 
 <br/><tt>void reset() noexcept;</tt>
 <br/><tab/><i>Effects:</i> If <tt>*this</tt> contains a value, calls <tt>val->T​::​~T()</tt> to destroy the contained value; otherwise no effect.
 <br/><tab/><i>Ensures:</i> <tt>*this</tt> does not contain a value.
 
+</ins></blockquote>
+<p><h4><ins> Allocator-related traits [pmroptional.traits]</ins></h4></p>
+<blockquote><ins>
+<br/><tt>    template&ltclass T&gt;</tt>
+<br/><tt>   struct uses_allocator&ltT, polymorphic_allocator&lt;&gt;&gt; : 
+<br/><tab/><tt>   uses_allocator&ltT,  polymorphic_allocator&lt;&gt;&gt; { };</tt>
 
 </ins></blockquote>
 
 <p><h3><ins> Relational operators [pmroptional.relops]</ins></h3></p>
 <blockquote><ins>
-<br/><tab/>   template&lt;class T, class U&gt; bool operator==(const <i>alloc-optional</i>&lt;T&gt;&amp;, const <i>alloc-optional</i>&lt;U&gt;&amp;);
-<br/><tab/>   template&lt;class T, class U&gt; bool operator==(const <i>alloc-optional</i>&lt;T&gt;&amp;, const std::optional&lt;U&gt;&amp;);
-<br/><tab/>   template&lt;class T, class U&gt; bool operator==(const std::optional&lt;T&gt;&amp;, const <i>alloc-optional</i>&lt;U&gt;&amp;);
-<br/><tab/><i>Mandates:</i> The expression <tt>*x == *y</tt> shall be well-formed and its result shall be convertible to
+<tt>
+<br/><tab/>   template&lt;class T, class U&gt; bool operator==(const optional&lt;T&gt;&amp;, const optional&lt;U&gt;&amp;);
+<br/><tab/>   template&lt;class T, class U&gt; bool operator==(const optional&lt;T&gt;&amp;, const std::optional&lt;U&gt;&amp;);
+<br/><tab/>   template&lt;class T, class U&gt; bool operator==(const std::optional&lt;T&gt;&amp;, const optional&lt;U&gt;&amp;);
+</tt>
+<br/><tab/><i>Mandates:</i> The expression <tt>*x == *y</tt> shall be well-formed and its result shall be convertible to 
 <tt>bool</tt>. [ <i>Note:</i> <tt>T</tt> need not be <tt>Cpp17EqualityComparable</tt>. — <i>end note</i> ]
 <br/><tab/><i>Returns:</i> If <tt>bool(x) != bool(y)</tt>, <tt>false</tt>; otherwise if <tt>bool(x) == false</tt>, <tt>true</tt>; otherwise <tt>*x == *y</tt>.
 
 
 <br/>
-<br/><tab/>   template&lt;class T, class U&gt; bool operator!=(const <i>alloc-optional</i>&lt;T&gt;&amp;, const <i>alloc-optional</i>&lt;U&gt;&amp;);
-<br/><tab/>   template&lt;class T, class U&gt;bool operator!=(const <i>alloc-optional</i>&lt;T&gt;&amp;, const std::optional&lt;U&gt;&amp;);
-<br/><tab/>   template&lt;class T, class U&gt; bool operator!=(const std::optional&lt;T&gt;&amp;, const <i>alloc-optional</i>&lt;U&gt;&amp;);
-<br/><tab/><i>Mandates:</i> The expression <tt>*x != *y</tt> shall be well-formed and its result shall be convertible to
-<tt>bool</tt>.
-<br/><tab/><i>Returns:</i> If <tt>bool(x) != bool(y)</tt>, <tt>true</tt>; otherwise if <tt>bool(x) == false</tt>, <tt>false</tt>;
+<tt>
+<br/><tab/>   template&lt;class T, class U&gt; bool operator!=(const optional&lt;T&gt;&amp;, const optional&lt;U&gt;&amp;);
+<br/><tab/>   template&lt;class T, class U&gt;bool operator!=(const optional&lt;T&gt;&amp;, const std::optional&lt;U&gt;&amp;);
+<br/><tab/>   template&lt;class T, class U&gt; bool operator!=(const std::optional&lt;T&gt;&amp;, const optional&lt;U&gt;&amp;);
+</tt>
+<br/><tab/><i>Mandates:</i> The expression <tt>*x != *y</tt> shall be well-formed and its result shall be convertible to 
+<tt>bool</tt>. 
+<br/><tab/><i>Returns:</i> If <tt>bool(x) != bool(y)</tt>, <tt>true</tt>; otherwise if <tt>bool(x) == false</tt>, <tt>false</tt>; 
 otherwise <tt>*x != *y</tt>.
 
 <br/>
-<br/><tab/>   template&lt;class T, class U&gt; bool operator&lt;(const <i>alloc-optional</i>&lt;T&gt;&amp;, const <i>alloc-optional</i>&lt;U&gt;&amp;);
-<br/><tab/>   template&lt;class T, class U&gt; bool operator&lt;(const <i>alloc-optional</i>&lt;T&gt;&amp;, const std::optional&lt;U&gt;&amp;);
-<br/><tab/>   template&lt;class T, class U&gt; bool operator&lt;(const std::optional&lt;T&gt;&amp;, const <i>alloc-optional</i>&lt;U&gt;&amp;);
-<br/><tab/><i>Mandates:</i> The expression <tt>*x &lt; *y</tt> shall be well-formed and its result shall be convertible to
-<tt>bool</tt>.
-<br/><tab/><i>Returns:</i> If <tt>!y</tt>, <tt>false</tt>; otherwise if <tt>!x</tt>, <tt>true</tt>;
+<tt>
+<br/><tab/>   template&lt;class T, class U&gt; bool operator&lt;(const optional&lt;T&gt;&amp;, const optional&lt;U&gt;&amp;);
+<br/><tab/>   template&lt;class T, class U&gt; bool operator&lt;(const optional&lt;T&gt;&amp;, const std::optional&lt;U&gt;&amp;);
+<br/><tab/>   template&lt;class T, class U&gt; bool operator&lt;(const std::optional&lt;T&gt;&amp;, const optional&lt;U&gt;&amp;);
+</tt>
+<br/><tab/><i>Mandates:</i> The expression <tt>*x &lt; *y</tt> shall be well-formed and its result shall be convertible to 
+<tt>bool</tt>. 
+<br/><tab/><i>Returns:</i> If <tt>!y</tt>, <tt>false</tt>; otherwise if <tt>!x</tt>, <tt>true</tt>; 
 otherwise <tt>*x &lt; *y</tt>.
 
 
 
 <br/>
-<br/><tab/>   template&lt;class T, class U&gt; bool operator&gt;(const <i>alloc-optional</i>&lt;T&gt;&amp;, const <i>alloc-optional</i>&lt;U&gt;&amp;);
-<br/><tab/>   template&lt;class T, class U&gt; bool operator&gt;(const <i>alloc-optional</i>&lt;T&gt;&amp;, const std::optional&lt;U&gt;&amp;);
-<br/><tab/>   template&lt;class T, class U&gt; bool operator&gt;(const std::optional&lt;T&gt;&amp;, const <i>alloc-optional</i>&lt;U&gt;&amp;);
-<br/><tab/><i>Mandates:</i> The expression <tt>*x &gt; *y</tt> shall be well-formed and its result shall be convertible to
-<tt>bool</tt>.
-<br/><tab/><i>Returns:</i> If <tt>!x</tt>, <tt>false</tt>; otherwise if <tt>!y</tt>, <tt>true</tt>;
+<tt>
+<br/><tab/>   template&lt;class T, class U&gt; bool operator&gt;(const optional&lt;T&gt;&amp;, const optional&lt;U&gt;&amp;);
+<br/><tab/>   template&lt;class T, class U&gt; bool operator&gt;(const optional&lt;T&gt;&amp;, const std::optional&lt;U&gt;&amp;);
+<br/><tab/>   template&lt;class T, class U&gt; bool operator&gt;(const std::optional&lt;T&gt;&amp;, const optional&lt;U&gt;&amp;);
+</tt>
+<br/><tab/><i>Mandates:</i> The expression <tt>*x &gt; *y</tt> shall be well-formed and its result shall be convertible to 
+<tt>bool</tt>. 
+<br/><tab/><i>Returns:</i> If <tt>!x</tt>, <tt>false</tt>; otherwise if <tt>!y</tt>, <tt>true</tt>; 
 otherwise <tt>*x &gt; *y</tt>.
 
 
 <br/>
-<br/><tab/>   template&lt;class T, class U&gt; bool operator&lt;=(const <i>alloc-optional</i>&lt;T&gt;&amp;, const <i>alloc-optional</i>&lt;U&gt;&amp;);
-<br/><tab/>   template&lt;class T, class U&gt; bool operator&lt;=(const <i>alloc-optional</i>&lt;T&gt;&amp;, const std::optional&lt;U&gt;&amp;);
-<br/><tab/>   template&lt;class T, class U&gt; bool operator&lt;=(const std::optional&lt;T&gt;&amp;, const <i>alloc-optional</i>&lt;U&gt;&amp;);
-<br/><tab/><i>Mandates:</i> The expression <tt>*x &lt;= *y</tt> shall be well-formed and its result shall be convertible to
-<tt>bool</tt>.
-<br/><tab/><i>Returns:</i> If <tt>!x</tt>, <tt>true</tt>; otherwise if <tt>!y</tt>, <tt>false</tt>;
+<tt>
+<br/><tab/>   template&lt;class T, class U&gt; bool operator&lt;=(const optional&lt;T&gt;&amp;, const optional&lt;U&gt;&amp;);
+<br/><tab/>   template&lt;class T, class U&gt; bool operator&lt;=(const optional&lt;T&gt;&amp;, const std::optional&lt;U&gt;&amp;);
+<br/><tab/>   template&lt;class T, class U&gt; bool operator&lt;=(const std::optional&lt;T&gt;&amp;, const optional&lt;U&gt;&amp;);
+</tt>
+<br/><tab/><i>Mandates:</i> The expression <tt>*x &lt;= *y</tt> shall be well-formed and its result shall be convertible to 
+<tt>bool</tt>. 
+<br/><tab/><i>Returns:</i> If <tt>!x</tt>, <tt>true</tt>; otherwise if <tt>!y</tt>, <tt>false</tt>; 
 otherwise <tt>*x &lt;= *y</tt>.
 
 
 <br/>
-<br/><tab/>   template&lt;class T, class U&gt; bool operator&t;=(const <i>alloc-optional</i>&lt;T&gt;&amp;, const <i>alloc-optional</i>&lt;U&gt;&amp;);
-<br/><tab/>   template&lt;class T, class U&gt; bool operator&gt;=(const <i>alloc-optional</i>&lt;T&gt;&amp;, const std::optional&lt;U&gt;&amp;);
-<br/><tab/>   template&lt;class T, class U&gt; bool operator&gt;=(const std::optional&lt;T&gt;&amp;, const <i>alloc-optional</i>&lt;U&gt;&amp;);
-<br/><tab/><i>Mandates:</i> The expression <tt>*x &gt;= *y</tt> shall be well-formed and its result shall be convertible to
-<tt>bool</tt>.
-<br/><tab/><i>Returns:</i> If <tt>!y</tt>, <tt>true</tt>; otherwise if <tt>!x</tt>, <tt>false</tt>;
+<tt>
+<br/><tab/>   template&lt;class T, class U&gt; bool operator&t;=(const optional&lt;T&gt;&amp;, const optional&lt;U&gt;&amp;);
+<br/><tab/>   template&lt;class T, class U&gt; bool operator&gt;=(const optional&lt;T&gt;&amp;, const std::optional&lt;U&gt;&amp;);
+<br/><tab/>   template&lt;class T, class U&gt; bool operator&gt;=(const std::optional&lt;T&gt;&amp;, const optional&lt;U&gt;&amp;);
+</tt>
+<br/><tab/><i>Mandates:</i> The expression <tt>*x &gt;= *y</tt> shall be well-formed and its result shall be convertible to 
+<tt>bool</tt>. 
+<br/><tab/><i>Returns:</i> If <tt>!y</tt>, <tt>true</tt>; otherwise if <tt>!x</tt>, <tt>false</tt>; 
 otherwise <tt>*x &gt;= *y</tt>.
 
 
 <br/>
+<tt>
 <br/><tab/>   template&lt;class T, three_way_comparable_with&lt;T&gt; U&gt;
 <br/><tab2/>	compare_three_way_result_t&lt;T,U&gt;
-<br/><tab/><tab2/>      operator&lt;=&gt;(const <i>alloc-optional</i>&lt;T&gt;&amp;, const <i>alloc-optional</i>&lt;U&gt;&amp;);
+<br/><tab/><tab2/>      operator&lt;=&gt;(const optional&lt;T&gt;&amp;, const optional&lt;U&gt;&amp;);
 <br/><tab/>   template&lt;class T, three_way_comparable_with&lt;T&gt; U&gt;
 <br/><tab2/>	compare_three_way_result_t&lt;T,U&gt;
-<br/><tab/><tab2/>      operator&lt;=&gt;(const <i>alloc-optional</i>&lt;T&gt;&amp;, const std::optional&lt;U&gt;&amp;);
+<br/><tab/><tab2/>      operator&lt;=&gt;(const optional&lt;T&gt;&amp;, const std::optional&lt;U&gt;&amp;);
 <br/><tab/>   template&lt;class T, three_way_comparable_with&lt;T&gt; U&gt;
 <br/><tab2/>	compare_three_way_result_t&lt;T,U&gt;
-<br/><tab/><tab2/>      operator&lt;=&gt;(const std::optional&lt;T&gt;&amp;, const <i>alloc-optional</i>&lt;U&gt;&amp;);
-
+<br/><tab/><tab2/>      operator&lt;=&gt;(const std::optional&lt;T&gt;&amp;, const optional&lt;U&gt;&amp;);
+</tt>
 <br/><tab/><i>Returns:</i> If <tt>x &amp;&amp; y</tt>, <tt>*x &lt;=&gt; *y</tt>; otherwise <tt>bool(x) &lt;=&gt; bool(y)</tt>.
 </ins></blockquote>
 
 <p><h3><ins> Comparison with nullopt [pmroptional.nullops]</ins></h3></p>
 <blockquote><ins>
-<br/><tab/>   template&lt;class T&gt; bool operator==(const <i>alloc-optional</i>&lt;T&gt;&amp;, nullopt_t) noexcept;
+<br/><tab/><tt>   template&lt;class T&gt; bool operator==(const optional&lt;T&gt;&amp;, nullopt_t) noexcept;</tt>
 <br/><tab/><i>Returns:</i> <tt>!x</tt>.
 
 <br/>
-<br/><tab/>   template&lt;class T&gt; strong_ordering operator&lt;=&gt;(const <i>alloc-optional</i>&lt;T&gt;&amp;, nullopt_t) noexcept;
+<br/><tab/><tt>   template&lt;class T&gt; strong_ordering operator&lt;=&gt;(const optional&lt;T&gt;&amp;, nullopt_t) noexcept;</tt>
 <br/><tab/><i>Returns:</i> <tt>bool(x) &lt;=&gt; false</tt>.
 </ins></blockquote>
 
@@ -1623,80 +1709,80 @@ otherwise <tt>*x &gt;= *y</tt>.
 <p><h3><ins> Comparison with <tt>T</tt> [pmroptional.comp.with.t]</ins></h3></p>
 <blockquote><ins>
 
-<br/><tab/>   template&lt;class T, class U&gt; bool operator==(const <i>alloc-optional</i>&lt;T&gt;&amp; x, const U&amp; v);
+<br/><tab/><tt>    template&lt;class T, class U&gt; bool operator==(const optional&lt;T&gt;&amp; x, const U&amp; v);</tt>
 <br/><tab/><i>Mandates:</i> The expression <tt>*x == v</tt> shall be well-formed and its result shall be convertible to <tt>bool</tt>.
 [ <tt>Note:</tt> <tt>T</tt> need not be <tt>Cpp17EqualityComparable</tt>. — <tt>end note </tt>]
 <br/><tab/><i>Effects: </i> Equivalent to: <tt>return bool(x) ? *x == v : false;</tt>
 
 
 <br/>
-<br/><tab/>   template&lt;class T, class U&gt; bool operator==(const T&amp; t, const <i>alloc-optional</i>&lt;U&gt;&amp; v);
-<br/><tab/><i>Mandates:</i> The expression <tt>x == *v</tt> shall be well-formed and its result shall be convertible to <tt>bool</tt>.
+<br/><tab/><tt>    template&lt;class T, class U&gt; bool operator==(const T&amp; t, const optional&lt;U&gt;&amp; v);</tt>
+<br/><tab/><i>Mandates:</i> The expression <tt>x == *v</tt> shall be well-formed and its result shall be convertible to <tt>bool</tt>. 
 <br/><tab/><i>Effects: </i> Equivalent to: <tt>return bool(v) ? x == *v : false;</tt>
 
 <br/>
-<br/><tab/>   template&lt;class T, class U&gt; bool operator!=(const <i>alloc-optional</i>&lt;T&gt;&amp; u, const U&amp; v);
+<br/><tab/><tt>    template&lt;class T, class U&gt; bool operator!=(const optional&lt;T&gt;&amp; u, const U&amp; v);</tt>
 <br/><tab/><i>Mandates:</i> The expression <tt>*x != v</tt> shall be well-formed and its result shall be convertible to <tt>bool</tt>.
 <br/><tab/><i>Effects: </i> Equivalent to: <tt>return bool(x) ? *x != v : true;</tt>
 
 <br/>
-<br/><tab/>   template&lt;class T, class U&gt; bool operator!=(const T&amp; t, const <i>alloc-optional</i>&lt;U&gt;&amp; v);
+<br/><tab/><tt>    template&lt;class T, class U&gt; bool operator!=(const T&amp; t, const optional&lt;U&gt;&amp; v);</tt>
 <br/><tab/><i>Mandates:</i> The expression <tt>x != *v</tt> shall be well-formed and its result shall be convertible to <tt>bool</tt>.
 <br/><tab/><i>Effects: </i> Equivalent to: <tt>return bool(v) ? x != *v : true;</tt>
 
 
 <br/>
-<br/><tab/>   template&lt;class T, class U&gt; bool operator&lt;(const <i>alloc-optional</i>&lt;T&gt;&amp;, const U&amp;);
+<br/><tab/><tt>    template&lt;class T, class U&gt; bool operator&lt;(const optional&lt;T&gt;&amp;, const U&amp;);</tt>
 <br/><tab/><i>Mandates:</i> The expression <tt>*x &lt; v</tt> shall be well-formed and its result shall be convertible to <tt>bool</tt>.
 <br/><tab/><i>Effects: </i> Equivalent to: <tt>return bool(x) ? *x &lt; v : true;</tt>
 
 
 <br/>
-<br/><tab/>   template&lt;class T, class U&gt; bool operator&lt;(const T&amp; t, const <i>alloc-optional</i>&lt;U&gt;&amp; v);
+<br/><tab/><tt>    template&lt;class T, class U&gt; bool operator&lt;(const T&amp; t, const optional&lt;U&gt;&amp; v);</tt>
 <br/><tab/><i>Mandates:</i> The expression <tt>x &lt; *v</tt> shall be well-formed and its result shall be convertible to <tt>bool</tt>.
 <br/><tab/><i>Effects: </i> Equivalent to: <tt>return bool(v) ? x &lt; *v : false;</tt>
 
 
 <br/>
-<br/><tab/>   template&lt;class T, class U&gt; bool operator&gt;(const <i>alloc-optional</i>&lt;T&gt;&amp;, const U&amp;);
+<br/><tab/><tt>    template&lt;class T, class U&gt; bool operator&gt;(const optional&lt;T&gt;&amp;, const U&amp;);</tt>
 <br/><tab/><i>Mandates:</i> The expression <tt>*x &gt; v</tt> shall be well-formed and its result shall be convertible to <tt>bool</tt>.
 <br/><tab/><i>Effects: </i> Equivalent to: <tt>return bool(x) ? *x &gt; v : false;</tt>
 
 
 <br/>
-<br/><tab/>   template&lt;class T, class U&gt; bool operator&gt;(const T&amp; t, const <i>alloc-optional</i>&lt;U&gt;&amp; v);
+<br/><tab/><tt>    template&lt;class T, class U&gt; bool operator&gt;(const T&amp; t, const optional&lt;U&gt;&amp; v);</tt>
 <br/><tab/><i>Mandates:</i> The expression <tt>x &gt; *v</tt> shall be well-formed and its result shall be convertible to <tt>bool</tt>.
 <br/><tab/><i>Effects: </i> Equivalent to: <tt>return bool(v) ? x &gt; *v : true;</tt>
 
 
 <br/>
-<br/><tab/>   template&lt;class T, class U&gt; bool operator&lt;=(const <i>alloc-optional</i>&lt;T&gt;&amp;, const U&amp;);
+<br/><tab/><tt>    template&lt;class T, class U&gt; bool operator&lt;=(const optional&lt;T&gt;&amp;, const U&amp;);</tt>
 <br/><tab/><i>Mandates:</i> The expression <tt>*x &lt;= v</tt> shall be well-formed and its result shall be convertible to <tt>bool</tt>.
 <br/><tab/><i>Effects: </i> Equivalent to: <tt>return bool(x) ? *x &lt;= v : true;</tt>
 
 
 <br/>
-<br/><tab/>   template&lt;class T, class U&gt; bool operator&lt;=(const T&amp; t, const <i>alloc-optional</i>&lt;U&gt;&amp; v);
+<br/><tab/><tt>    template&lt;class T, class U&gt; bool operator&lt;=(const T&amp; t, const optional&lt;U&gt;&amp; v);</tt>
 <br/><tab/><i>Mandates:</i> The expression <tt>x &lt;= *v</tt> shall be well-formed and its result shall be convertible to <tt>bool</tt>.
 <br/><tab/><i>Effects: </i> Equivalent to: <tt>return bool(v) ? x &lt;= *v : false;</tt>
 
 
 <br/>
-<br/><tab/>   template&lt;class T, class U&gt; bool operator&gt;=(const <i>alloc-optional</i>&lt;T&gt;&amp;, const U&amp;);
+<br/><tab/><tt>    template&lt;class T, class U&gt; bool operator&gt;=(const optional&lt;T&gt;&amp;, const U&amp;);</tt>
 <br/><tab/><i>Mandates:</i> The expression <tt>*x &gt;= v</tt> shall be well-formed and its result shall be convertible to <tt>bool</tt>.
 <br/><tab/><i>Effects: </i> Equivalent to: <tt>return bool(x) ? *x &gt;= v : false;</tt>
 
 
 <br/>
-<br/><tab/>   template&lt;class T, class U&gt; bool operator&gt;=(const T&amp; t, const <i>alloc-optional</i>&lt;U&gt;&amp; v);
+<br/><tab/> <tt>   template&lt;class T, class U&gt; bool operator&gt;=(const T&amp; t, const optional&lt;U&gt;&amp; v);</tt>
 <br/><tab/><i>Mandates:</i> The expression <tt>x &gt;= *v</tt> shall be well-formed and its result shall be convertible to <tt>bool</tt>.
 <br/><tab/><i>Effects: </i> Equivalent to: <tt>return bool(v) ? x &gt;= *v : true;</tt>
 
 
 <br/>
-<br/><tab/>   template&lt;class T, three_way_comparable_with&lt;T&gt; U&gt;
+<br/><tab/><tt>    template&lt;class T, three_way_comparable_with&lt;T&gt; U&gt;
 <br/><tab2/>	compare_three_way_result_t&lt;T,U&gt;
-<br/><tab/><tab2/>      operator&lt;=&gt;(const <i>alloc-optional</i>&lt;T&gt;&amp; x, const U&amp;v);
+<br/><tab/><tab2/>      operator&lt;=&gt;(const optional&lt;T&gt;&amp; x, const U&amp;v);</tt>
 <br/><tab/><i>Effects: </i> Equivalent to: <tt>return bool(x) ? *x &gt;=&lt; v : strong_­ordering​::​less ;</tt>
 
 </ins></blockquote>
@@ -1704,61 +1790,73 @@ otherwise <tt>*x &gt;= *y</tt>.
 <p><h3><ins>  Specialized algorithms [pmroptional.specalg]</ins></h3></p>
 <blockquote><ins>
 
-<br/><tab/>   template&lt;class T&gt; void swap(<i>alloc-optional</i>&lt;T&gt;&amp; x, <i>alloc-optional</i>&lt;T&gt;&amp; y) noexcept(see below);
+<br/><tab/><tt>   template&lt;class T&gt; void swap(optional&lt;T&gt;&amp; x, optional&lt;T&gt;&amp; y) noexcept(<i>see below</i>);</tt>
 <br/><tab/><i>Effects: </i> Calls <tt> x.swap(y)</tt>.
-<br/><tab/><i>Mandates: </i> <tt>is_­move_­constructible_­v&lt;T&gt;</tt>
+<br/><tab/><i>Remarks: </i> This function shall not participate in overload resolution unless <tt>is_­move_­constructible_­v&lt;T&gt;</tt> 
 is <tt>true</tt> and <tt>is_­swappable_­v&lt;T&gt;</tt> is <tt>true</tt>.
 
 <br/>
-<br/><tab/>   template&lt;class T&gt; constexpr optional&lt;decay_­t&lt;T&gt;&gt; make_optional(T&amp;&amp;);
+<br/><tab/><tt>   template&lt;class T&gt; constexpr optional&lt;decay_­t&lt;T&gt;&gt; make_optional(T&amp;&amp;);</tt>
 <br/><tab/><i>Returns: </i> <tt>optional&lt;decay_­t&lt;T&gt;&gt;(std​::​forward&lt;T&gt;(v)).</tt>
-<br/><tab/><i>Remarks: </i> Specialization of this function template shall be a constexpr function if
-<tt>uses_allocator&lt;T, polymorphic_allocator&lt;&gt;&gt;::value</tt> is <tt>false</tt> and the
-expression <tt>T(std​::​forward&lt;T&gt;(v))</tt> is a core constant expression.
+<br/><tab/><i>Remarks: </i> Specialization of this function template shall be a constexpr function if  
+<tt>uses_allocator&lt;T, polymorphic_allocator&lt;&gt;&gt;::value</tt> is <tt>false</tt>. 
 
 <br/>
-<br/><tab/>   template&lt;class T, class... Args> constexpr optional&lt;T&gt; make_optional(Args&amp;&amp;... args);
+<br/><tab/><tt>   template&lt;class T&gt; constexpr optional&lt;T&gt; make_optional();</tt>
+<br/><tab/><i>Effects: </i> Equivalent to: <tt> return optional&lt;T&gt(in_­place).</tt>
+<br/><tab/><i>Remarks: </i> Specialization of this function template shall be a constexpr function if  
+<tt>uses_allocator&lt;T, polymorphic_allocator&lt;&gt;&gt;::value</tt> is <tt>false</tt>.
+
+<br/>
+<br/><tab/><tt>   template&lt;class T, class Arg0, class... Args&gt constexpr 
+                    optional&lt;T&gt; make_optional(Arg0&amp;&amp; arg0, Args&amp;&amp;... args);</tt>
+<br/><tab/><i>Effects: </i> Equivalent to: <tt> return optional&lt;T&gt(in_­place, std​::​forward&lt;Arg0&gt;(arg0), std​::​forward&lt;Args&gt;(args)...).</tt>
+<br/><tab/><i>Constraints: </i><tt> !is_same&lt; typename remove_cvref_t&lt;ARG0&gt;, allocator_arg_t&gt;</tt>
+<br/><tab/><i>Remarks: </i> Specialization of this function template shall be a constexpr function if  
+<tt>uses_allocator&lt;T, polymorphic_allocator&lt;&gt;&gt;::value</tt> is <tt>false</tt>.
+
+<br/>
+<br/><tab/><tt>   template&lt;class T, class... Args&gt constexpr optional&lt;T&gt; make_optional(Args&amp;&amp;... args);</tt>
 <br/><tab/><i>Effects: </i> Equivalent to: <tt> return optional&lt;T&gt(in_­place, std​::​forward&lt;Args&gt;(args)...).</tt>
-<br/><tab/><i>Remarks: </i> Specialization of this function template shall be a constexpr function if
-<tt>uses_allocator&lt;T, polymorphic_allocator&lt;&gt;&gt;::value</tt> is <tt>false</tt> and the
-expression <tt>T(std​::​forward&lt;Args&gt;(args)...)</tt> is a core constant expression.
+<br/><tab/><i>Remarks: </i> Specialization of this function template shall be a constexpr function if  
+<tt>uses_allocator&lt;T, polymorphic_allocator&lt;&gt;&gt;::value</tt> is <tt>false</tt>.
 
 <br/>
-<br/><tab/>   template&lt;class T, class U, class... Args> optional&lt;T&gt;
-<br/><tab2/>  constexpr make_optional(initializer_list&lt;U&gt; il, Args&amp;&amp;... args);
+<br/><tab/><tt>   template&lt;class T, class U, class... Args> optional&lt;T&gt; </tt>
+<br/><tab2/><tt>  constexpr make_optional(initializer_list&lt;U&gt; il, Args&amp;&amp;... args);</tt>
 <br/><tab/><i>Effects: </i> Equivalent to: <tt> return optional&lt;T&gt(in_­place, il, std​::​forward&lt;Args&gt;(args)...).</tt>
-<br/><tab/><i>Remarks: </i> Specialization of this function template shall be a constexpr function if
-<tt>uses_allocator&lt;T, polymorphic_allocator&lt;&gt;&gt;::value</tt> is <tt>false</tt> and the
-expression <tt>T(il, std​::​forward&lt;Args&gt;(args)...)</tt> is a core constant expression.
+<br/><tab/><i>Remarks: </i> Specialization of this function template shall be a constexpr function if  
+<tt>uses_allocator&lt;T, polymorphic_allocator&lt;&gt;&gt;::value</tt> is <tt>false</tt>.
 
 <br/>
-<br/><tab/>   template&lt;class T, optional&lt;decay_­t&lt;T&gt;&gt;
-<br/><tab2/>  alloc_optional(const polymorphic_allocator&lt;&gt;&amp; a, T&amp;&amp;);
+<br/><tab/><tt>  template&lt;class T, optional&lt;decay_­t&lt;T&gt;&gt; </tt>
+<br/><tab2/><tt>  make_optional(allocator_arg_t, const polymorphic_allocator&lt;&gt;&amp; a, T&amp;&amp;);</tt>
 <br/><tab/><i>Mandates:</i> <tt>uses_allocator&lt;T,polymorphic_allocator&lt;&gt;&gt;</tt> is true;
-<br/><tab/><i>Returns: </i> <tt>optional&lt;decay_­t&lt;T&gt;&gt;(in_place, allocator_arg, a, std​::​forward&lt;T&gt;(v)).</tt>
+<br/><tab/><i>Returns: </i> <tt>optional&lt;decay_­t&lt;T&gt;&gt;(allocator_arg, a, in_place, std​::​forward&lt;T&gt;(v)).</tt>
 
 <br/>
-<br/><tab/>   template&lt;class T, class... Args> optional&lt;T&gt;
-<br/><tab2/>  alloc_optional(const polymorphic_allocator&lt;&gt;&amp; a, Args&amp;&amp;... args);
+<br/><tab/><tt>   template&lt;class T, class... Args> optional&lt;T&gt; </tt>
+<br/><tab2/><tt>  make_optional(allocator_arg_t, const polymorphic_allocator&lt;&gt;&amp; a, Args&amp;&amp;... args);</tt>
 <br/><tab/><i>Mandates:</i> <tt>uses_allocator&lt;T,polymorphic_allocator&lt;&gt;&gt;</tt> is true;
-<br/><tab/><i>Effects: </i> Equivalent to: <tt> return optional&lt;T&gt(in_place, allocator_arg, a, std​::​forward&lt;Args&gt;(args)...).</tt>
+<br/><tab/><i>Effects: </i> Equivalent to: <tt> return optional&lt;T&gt(allocator_arg, a, in_place, std​::​forward&lt;Args&gt;(args)...).</tt>
 
 <br/>
-<br/><tab/>   template&lt;class T, class U, class... Args> optional&lt;T&gt;
-<br/><tab2/>  alloc_optional(const polymorphic_allocator&lt;&gt;&amp; a, initializer_list&lt;U&gt; il, Args&amp;&amp;... args);
+<br/><tab/><tt>   template&lt;class T, class U, class... Args> optional&lt;T&gt;</tt>
+<br/><tab2/><tt>  make_optional(allocator_arg_t, const polymorphic_allocator&lt;&gt;&amp; a, initializer_list&lt;U&gt; il, Args&amp;&amp;... args);</tt>
 <br/><tab/><i>Mandates:</i> <tt>uses_allocator&lt;T,polymorphic_allocator&lt;&gt;&gt;</tt> is true;
-<br/><tab/><i>Effects: </i> Equivalent to: <tt> return optional&lt;T&gt(in_place, allocator_arg, a, il, std​::​forward&lt;Args&gt;(args)...).</tt>
+<br/><tab/><i>Effects: </i> Equivalent to: <tt> return optional&lt;T&gt(allocator_arg, a, in_place, il, std​::​forward&lt;Args&gt;(args)...).</tt>
 
 </ins></blockquote>
 
 <p><h3><ins>  Hash support [pmroptional.hash]</ins></h3></p>
 <blockquote><ins>
-<br/><tab/>   template&lt;class T&gt; struct hash&lt;<i>alloc-optional</i>&lt;T&gt;&gt;;
-<br/><tab/> The specialization <tt>hash&lt;<i>alloc-optional</i>&lt;T&gt;&gt;</tt> is enabled ([unord.hash]) if and only if
-<tt>hash&lt;remove_­const_­t&lt;T&gt;&gt;</tt> is enabled. When enabled, for an object <tt>o</tt> of type <tt><i>alloc-optional</i>&lt;T&gt;</tt>,
-if <tt>bool(o) == true</tt>, then <tt>hash&lt;<i>alloc-optional</i>&lt;T&gt;&gt;()(o)</tt> shall evaluate to the
-same value as <tt>hash&lt;remove_­const_­t&lt;T&gt;&gt;()(*o)</tt>; otherwise it evaluates to an unspecified value.
+<br/><tab/><tt>   template&lt;class T&gt; struct hash&lt;optional&lt;T&gt;&gt;;</tt>
+<br/><tab/> The specialization <tt>hash&lt;optional&lt;T&gt;&gt;</tt> is enabled ([unord.hash]) if and only if 
+<tt>hash&lt;remove_­const_­t&lt;T&gt;&gt;</tt> is enabled. When enabled, for an object <tt>o</tt> of type <tt>optional&lt;T&gt;</tt>, 
+if <tt>bool(o) == true</tt>, then <tt>hash&lt;optional&lt;T&gt;&gt;()(o)</tt> shall evaluate to the 
+same value as <tt>hash&lt;remove_­const_­t&lt;T&gt;&gt;()(*o)</tt>; otherwise it evaluates to an unspecified value. 
 The member functions are not guaranteed to be <tt>noexcept</tt>.
+</ins></blockquote>
 
 </body>
-</html>
+</html> 
