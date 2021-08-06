@@ -713,7 +713,7 @@ namespace std::pmr {
 <br/>
  <br/><tab/> // [pmroptional.specalg], specialized algorithms
 <br/><tab/>   template&lt;class T&gt;
-<br/><tab2/>    void swap(optional&lt;T&gt;&amp;, optional&lt;T&gt;&amp;);
+<br/><tab2/>    void swap(optional&lt;T&gt;&amp;, optional&lt;T&gt;&amp;) ;
 <br/>
 <br/><tab/>   template&lt;class T&gt;
 <br/><tab2/>	constexpr optional&lt;<i>see below</i>&gt; make_optional(T&amp;&amp;);
@@ -1474,11 +1474,19 @@ with allocator <tt><i>M_alloc</i></tt>.
 <p><h4><ins> Swap [pmroptional.swap]</ins></h4></p>
 <blockquote><ins>
 
-<br/><tt>void swap(optional&amp; rhs);</tt>
+<br/><tt>void swap(optional&amp; rhs) noexcept(<i>see below</i>);</tt>
 <br/><tab/><i>Constraints:</i> Lvalues of type <tt>T</tt> shall be swappable and <tt>is_­move_­constructible_­v&lt;T&gt;</tt> is <tt>true</tt>.
 <br/><tab/><i>Expects:</i>If <tt>uses_allocator&lt;T, polymorphic_allocator&lt;&gt;&gt;</tt>
  is <tt>true</tt>, <tt>a.get_allocator() == b.get_allocator()</tt>.
 <br/><tab/><i>Effects:</i> See Table x
+<br/><tab/><i>Throws:</i> Any exceptions thrown by the operations in the relevant part of Table x.
+<br/><tab/><i>Remarks:</i> The expression inside <tt>noexcept</tt> is equivalent to:
+<tt>is_nothrow_move_constructible_v&lt;T&gt; &and;&and; is_nothrow_swappable_v&lt;T&gt;</tt>
+If any exception is thrown, the results of the expressions <tt>bool(*this)</tt> and <tt>bool(rhs)</tt> remain unchanged.
+If an exception is thrown during the call to function <tt>swap</tt>, the state of <tt>*val</tt> and <tt>*rhs.val</tt> is determined
+by the exception safety guarantee of <tt>swap</tt> for lvalues of <tt>T</tt>. If an exception is thrown during the call to
+<tt>T</tt>’s move constructor, the state of tt>*val</tt>  and <tt>*rhs.val</tt> is determined by the exception safety guarantee
+of <tt>T</tt>’s move constructor.
 <blockquote><table border="1">
 <caption><ins>Table x &mdash; <tt>swap(optional&amp;)</tt> effects</ins></caption>
 <tr>
