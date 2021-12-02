@@ -84,7 +84,9 @@ do any allocation, and that the name is not appropriate
 <br/>- modified the specification of <tt>std::pmr::optional</tt> to be expressed in terms of 
 	<tt>std::pmr::polymorphic_allocator&lt;&gt;</tt>, as opposed to <tt>std::pmr::memory_resource</tt>
 gt;</p>
-
+<br/>- moved <tt>std::pmr::optional</tt> to <tt>optional</tt> header as discussed in the reflector discussion
+<br/>- added request for discussion on making <tt>std::pmr::optional</tt> a more allocator generic type.
+<br/>- added free swap function to be in line with P0178 
 
 <h2>Motivation and Proposal Summary</h2>
 <p>
@@ -178,13 +180,15 @@ gt;</p>
 and using the nested <tt>type</tt> of the <tt>std::conditional</tt> as the function template parameter  made for an undeduced context.
 </p>
   
+<br/>The free swap function has been made to have a wide contract and work with different allocators, as discussed in 
+P0178 (http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2016/p0178r0.html)
 
 <h2>Feedback items for LEWG: </h2>
 
 <p>
 	<h3>Should <tt>std::pmr::optional</tt> be placed in the <tt>&lt;optional&gt;</tt> header?</p>
 </h3>
-	<br/> This proposal puts <tt>std::pmr::optional</tt> in a new header. Historically, pmr containers didn't have their own header files.
+	<br/> This proposal puts <tt>std::pmr::optional</tt> in a <tt>optional</tt> header. Historically, pmr containers didn't have their own header files.
 	However, <tt>std::pmr::optional</tt> is a more complex type than, for example, <tt>std::pmr::vector</tt>.
 	<br/>
 <h3>Should the deduction guide for mixed optional unpack or not?</p>
@@ -222,7 +226,7 @@ wouldn't be.
 <p><h3> Which allocator should be used in value_or ?</p></h3>
 <p>
   It is not all that obvious which allocator should be used for the
-	object returned by <tt>value_or</t>>. Should the decision be left to the type
+	object returned by <tt>value_or</tt>. Should the decision be left to the type
   or should it be mandated by the optional ? That is, should the object
   be constructed by plain copy/move construction or with uses-allocator 
   construction?
@@ -240,6 +244,14 @@ wouldn't be.
   zero extra space in most (but not all) cases. (The exception would be a type that stores 
   its allocator outside of its footprint and whose footprint is smaller than 
   polymorphic_allocator<>.)
+</p>
+
+<p><h3>Should <tt>std::pmr::optional</tt> be a more allocator generic type  </h3></p>
+<p>
+  In the reflector discussion, Ville Voutilainen and Tomasz Kamińskimasz made the following request : ": The C++ standard library should 
+  provide building blocks that allow multiple semantics to be expressed, as opposed to deciding on a narrow subset, 
+  and making an allocator-aware optional obey the static properties, namely the propagation traits, of an allocator is a fundamental piece of such genericity.
+  See P2080 https://wg21.link/P2080"
 </p>
 <h2>Proposed wording</h2>
 <p>
@@ -618,7 +630,7 @@ determined by the exception safety guarantee of <tt>T</tt>'s assignment.
 Insert new sections after 20.6.3 Class template optional [optional.optional]
 </p>
 <ins>
-<p><h3><ins> Header &lt;pmroptional&gt; synopsis [pmroptional.sys]</pmroptional></ins></h3>
+<p><h3><ins> Header &lt;optional&gt; synopsis [pmroptional.sys]</pmroptional></ins></h3>
 
 <blockquote><ins><code>
 namespace std::pmr {	
@@ -701,7 +713,7 @@ namespace std::pmr {
 <br/>
  <br/><tab/> // [pmroptional.specalg], specialized algorithms
 <br/><tab/>   template&lt;class T&gt;
-<br/><tab2/>    void swap(optional&lt;T&gt;&amp;, optional&lt;T&gt;&amp;) noexcept(<i>see below</i>);
+<br/><tab2/>    void swap(optional&lt;T&gt;&amp;, optional&lt;T&gt;&amp;) ;
 <br/>
 <br/><tab/>   template&lt;class T&gt;
 <br/><tab2/>	constexpr optional&lt;<i>see below</i>&gt; make_optional(T&amp;&amp;);
@@ -1462,11 +1474,19 @@ with allocator <tt><i>M_alloc</i></tt>.
 <p><h4><ins> Swap [pmroptional.swap]</ins></h4></p>
 <blockquote><ins>
 
-<br/><tt>void swap(optional&amp; rhs);</tt>
+<br/><tt>void swap(optional&amp; rhs) noexcept(<i>see below</i>);</tt>
 <br/><tab/><i>Constraints:</i> Lvalues of type <tt>T</tt> shall be swappable and <tt>is_­move_­constructible_­v&lt;T&gt;</tt> is <tt>true</tt>.
 <br/><tab/><i>Expects:</i>If <tt>uses_allocator&lt;T, polymorphic_allocator&lt;&gt;&gt;</tt>
  is <tt>true</tt>, <tt>a.get_allocator() == b.get_allocator()</tt>.
 <br/><tab/><i>Effects:</i> See Table x
+<br/><tab/><i>Throws:</i> Any exceptions thrown by the operations in the relevant part of Table x.
+<br/><tab/><i>Remarks:</i> The expression inside <tt>noexcept</tt> is equivalent to:
+<tt>is_nothrow_move_constructible_v&lt;T&gt; &and;&and; is_nothrow_swappable_v&lt;T&gt;</tt>
+If any exception is thrown, the results of the expressions <tt>bool(*this)</tt> and <tt>bool(rhs)</tt> remain unchanged.
+If an exception is thrown during the call to function <tt>swap</tt>, the state of <tt>*val</tt> and <tt>*rhs.val</tt> is determined
+by the exception safety guarantee of <tt>swap</tt> for lvalues of <tt>T</tt>. If an exception is thrown during the call to
+<tt>T</tt>’s move constructor, the state of tt>*val</tt>  and <tt>*rhs.val</tt> is determined by the exception safety guarantee
+of <tt>T</tt>’s move constructor.
 <blockquote><table border="1">
 <caption><ins>Table x &mdash; <tt>swap(optional&amp;)</tt> effects</ins></caption>
 <tr>
@@ -1790,10 +1810,16 @@ otherwise <tt>*x &gt;= *y</tt>.
 <p><h3><ins>  Specialized algorithms [pmroptional.specalg]</ins></h3></p>
 <blockquote><ins>
 
-<br/><tab/><tt>   template&lt;class T&gt; void swap(optional&lt;T&gt;&amp; x, optional&lt;T&gt;&amp; y) noexcept(<i>see below</i>);</tt>
-<br/><tab/><i>Effects: </i> Calls <tt> x.swap(y)</tt>.
-<br/><tab/><i>Remarks: </i> This function shall not participate in overload resolution unless <tt>is_­move_­constructible_­v&lt;T&gt;</tt> 
-is <tt>true</tt> and <tt>is_­swappable_­v&lt;T&gt;</tt> is <tt>true</tt>.
+<br/><tab/><tt>   template&lt;class T&gt; void swap(optional&lt;T&gt;&amp; x, optional&lt;T&gt;&amp; y)</tt>
+<br/><tab/><i>Effects: </i> if <tt>x.get_allocator() == y.get_allocator()</tt>, calls <tt> x.swap(y)</tt>. Otherwise equvivalent to
+<tt>
+<br/><tab2/>std::pmr::optional futureX(allocator_arg_t,x.get_allocator(),y);
+<br/><tab2/>std::pmr::optional futureY(allocator_arg_t,y.get_allocator(),x);
+<br/><tab2/>futureX.swap(x);
+<br/><tab2/>futureY.swap(y);
+
+</tt>
+
 
 <br/>
 <br/><tab/><tt>   template&lt;class T&gt; constexpr optional&lt;decay_­t&lt;T&gt;&gt; make_optional(T&amp;&amp;);</tt>
