@@ -201,9 +201,35 @@ P0178 (http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2016/p0178r0.html)
   This approach would consist of a basic_optional type :
 <br/>
 <br/>  <tt> template &lt;class T, class Alloc&gt
-<br/>       basic_optional&lt;T, Alloc&gt;</tt>  // use allocator traits of <tt>Alloc</tt> to decide what happens at copy construction and assignment. 
+<br/>       basic_optional&lt;T, Alloc&gt;</tt>  
 <br/> 
-<br/>  Consequently, <tt>pmr::optional&lt;T&gt;</tt> would be <tt>basic_optional&lt;T, std::pmr::polymorphic_allocator&lt;&gt;&gt;</tt>
+<br/>Furthermore, <tt>pmr::optional&lt;T&gt;</tt> would be <tt>basic_optional&lt;T, std::pmr::polymorphic_allocator&lt;&gt;&gt;</tt>
+</p>
+<p>
+<br/> Such <tt>basic_optional</tt> would be "allocator aware" even for types that use an allocator which is not an <tt>std::pmr::polymorphic_allocator</tt>.
+ Users of allocators with different propagation traits to <tt>std::pmr::polymorphic_allocator</tt> would not be required to write their own
+ allocator aware optional implementations as basic_optional would respect the propagation traits of the allocator used, and could be used
+ with allocator aware containers like vector "out of the box". These users are not theoretical. In his feedback, Ville Voutilainen writes :
+<br/>
+<br/><tab/> <i>"I have
+resource-constrained (read "embedded" if you like) scenarios where I
+need to
+specify a memory arena that a particular software component uses. All
+allocator-aware things in that component need
+to use the same arena, and it's much preferred if the same arena is
+used by default, instead of having to specify it
+explicity as an exception to the default. For that to happen, SOCCC
+needs to return the same allocator, not create
+a fresh new one, and POCMA needs to be true. I can't solve this with a
+per-thread default resource, there are multiple
+separate components running on the same thread, using separate memory arenas.
+
+Our pmr::memory_resource works fine for such scenarios. Our
+std::polymorphic_allocator does not. Our containers
+work fine, because they obey the propagation traits. New facilities
+don't work in such scenarios if they don't support
+propagation traits that are different from the ones of
+std::polymorphic_allocator." </i>
   
 </p>
 
