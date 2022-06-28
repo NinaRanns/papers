@@ -232,6 +232,51 @@ propagation traits that are different from the ones of
 std::polymorphic_allocator." </i>
   
 </p>
+<p> Such approach adds complexity to the design and reasoning about what happens. 
+Consider:
+<br/>
+<tt>
+<br/>basic_optional&lt;T, AllocA &gt; alice;
+<br/>basic_optional&lt;U, AllocB &gt; bob = alice; // #1
+<br/>alice = bob // #2</tt>
+<br/> 
+<br/>The questions that need to be answered are
+<br/>1)  what requirements are needed from AllocA and AllocB for #1 and #2 to be valid ?
+<br/>2)  what is the resulting allocator ?     
+<br/>
+<br/> One possible approach is to disallow #1 and #2 unless AllocA and AllocB are 
+different specialisations of the same allocator. The user can still achieve construction/assignment 
+by retrieving the underlying value type object :
+<br/>
+ <tt>
+<br/>basic_optional&lt;T, AllocA &gt; alice;
+<br/>basic_optional&lt;U, AllocB &gt; bob = alice.value(); 
+<br/>alice = bob.value() </tt>
+<br/>
+<br/>It's worth noting that this approach increases 
+the number of constructors and assignment operators.
+
+<br/> 
+<br/> With the approach described above, the resulting allocator is determined by the 
+<tt>allocator_traits&lt;AllocB&gt;</tt> which are the same as <tt>allocator_traits&lt;AllocA&gt;</tt>.
+To ensure this is the case, and to keep the value_type allocator in sync with the basic_optiona allocator, 
+every operation which would modify the allocator according to 
+the <tt>allocator_traits&lt;AllocB&gt;</tt> needs to be implemented in terms of uses-allocator construction.
+<br/>
+<br/> Now consider :
+<br/>
+<tt><br/>alice = basic_optional&lt;T, AllocA &gt;{} </tt>
+<br/>
+<br/> When <tt>allocator_traits&lt;AllocA &gt;::propagate_on_container_move_assignment::value == true</tt>,
+<tt>allocator_traits&lt;AllocA &gt;::propagate_on_container_copy_assignment::value == false</tt>, 
+and <tt>T</tt> does not support move semantics, we get into a situation where an assignment through optional
+object propagates the allocator, while the same assignment to a naked value_type objects doesn't. If the user
+designed the type (i.e. deliberately disabled move semantics) with the intention that the allocator never 
+changes after the object has been constructed, this could cause a problem.
+
+<br/>
+
+</p>
 
 <p>
 	<h3>Should <tt>std::pmr::optional</tt> be placed in the <tt>&lt;optional&gt;</tt> header?</p>
