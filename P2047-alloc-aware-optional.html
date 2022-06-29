@@ -211,10 +211,8 @@ P0178 (http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2016/p0178r0.html)
  allocator aware optional implementations as basic_optional would respect the propagation traits of the allocator used, and could be used
  with allocator aware containers like vector "out of the box". These users are not theoretical. In his feedback, Ville Voutilainen writes :
 <br/>
-<br/><tab/> <i>"I have
-resource-constrained (read "embedded" if you like) scenarios where I
-need to
-specify a memory arena that a particular software component uses. All
+<br/><tab/> <i>"I have resource-constrained (read "embedded" if you like) scenarios where I
+need to specify a memory arena that a particular software component uses. All
 allocator-aware things in that component need
 to use the same arena, and it's much preferred if the same arena is
 used by default, instead of having to specify it
@@ -272,14 +270,17 @@ the <tt>allocator_traits&lt;AllocB&gt;</tt> needs to be implemented in terms of 
 and <tt>T</tt> does not support move semantics, we get into a situation where an assignment through optional
 object propagates the allocator, while the same assignment to a naked value_type objects doesn't. If the user
 designed the type (i.e. deliberately disabled move semantics) with the intention that the allocator never 
-changes after the object has been constructed, this could cause a problem.
-
-<br/>
-
+changes after the object has been constructed, this could cause a problem. We are not aware of such users, but
+the case is presented for the purposes of documenting that it has been considered.
+</p>
+<p> The issues discussed above are avoided in the current design because allocator traits of <tt>std::pmr::polymorphic_allocator&lt;&gt;</tt>
+do not allow for allocator to change after the object has been created. Similarly, because only one allocator family is supported, there is no need
+to consider cases where the rhs allocator is of an unrelated type. However, the application of the current design is limited to a subset of 
+users of allocator aware standard containers. This in turn means that the problem this paper is trying to solve (i.e. creating an allocator
+aware optional type) would not be solved for all users of an allocator aware <tt>vector</tt>.
 </p>
 
-<p>
-	<h3>Should <tt>std::pmr::optional</tt> be placed in the <tt>&lt;optional&gt;</tt> header?</p>
+	<h3>Should <tt>std::pmr::optional</tt> be placed in the <tt>&lt;optional&gt;</tt> header?
 </h3>
 	<br/> This proposal puts <tt>std::pmr::optional</tt> in a <tt>optional</tt> header. Historically, pmr containers didn't have their own header files.
 	However, <tt>std::pmr::optional</tt> is a more complex type than, for example, <tt>std::pmr::vector</tt>.
