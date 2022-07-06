@@ -24,7 +24,7 @@
 <body>
 
 <address align=right>
-Document number: P2047R3
+Document number: P2047R4
 <br/>
 Audience: LEWG
 <br/>
@@ -90,6 +90,9 @@ do any allocation, and that the name is not appropriate
 <br/>R3:
 <br/>- replaced instances of <i>M_alloc</i> with <i>alloc</i>
 <br/>- clarified pmr::optional constructor descriptions to call out uses-allocator construction
+<br/>R4:
+<br/>- expanded <tt>basic_optional</tt> discussion
+<br/>- replaced uses-allocator construction with <tt>allocator_traits&lt;Allocator&gt;::construct()</tt>
 
 <h2>Motivation and Proposal Summary</h2>
 <p>
@@ -181,6 +184,76 @@ and using the nested <tt>type</tt> of the <tt>std::conditional</tt> as the funct
   
 <br/>The free swap function has been made to have a wide contract and work with different allocators, as discussed in 
 P0178 (http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2016/p0178r0.html)
+
+<p> Earlier version of the proposal used uses-allocator construction, but the current version suggests using 
+<tt>allocator_traits&lt;Allocator&gt;::construct()</tt> instead. Likening optional to a container having 
+zero or one elements, then using <tt>allocator_traits&lt;Allocator&gt;::construct()</tt>  would be the only consistent behavior.  
+If the allocator is not scoped, then there is no point in using allocator aware optional, as the allocator would have
+no effect on the constructed element.  In the case of most containers, the allocator has two roles: providing memory 
+for the container's use, and constructing the elements. In the case of allocator aware optional, the first purpose is eliminated.  
+Thus, if the allocator has no interesting behavior on <tt>construct</tt>, then there is no point in having it part of optional.  
+</p>
+<p>
+The point of the allocator being scoped is not that it must be a part of vector or other container, 
+but that the element itself is scoped inside the optional object.  The optional object itself is a container having a size of zero or one.
+A container passes its allocator to its element(s) only if it is a scoped allocator, and the same should apply to allocator aware optional. 
+Iff the allocator is not scoped, then it serves no purpose within the `basic_optional`; the element does not track the same allocator 
+as the `optional` and the `optional` does not allocate memory on its own.
+</p>
+<p>
+It can be argued that having a `basic_optional` that holds a non-scoped allocator and pretends that it is scoped (to one level deep) 
+could be useful, but it is a novel situation that we have not encountered before.  If user really wants to do that, they can wrap their 
+allocator in <tt>scoped_allocator_adaptor</tt>.  Everything would be consistent and clean and no novel categories of AA objects would be introduced.
+</p>
+<p>
+To demonstrate the point, we can simulate an allocator aware optional using a vector:
+</p>
+<p>
+<tt>using basic_string&lt;char, char_traits&lt;char&gt;, SomeAlloc&lt;char&gt;&gt; MyString;
+<br/> SomeAlloc&lt;char&gt; allocX("X");
+<br/> 
+<br/> vector&lt;MyString, SomeAlloc&lt;MyString&gt;&gt; v(allocX);  // v acts like a disengaged optional
+<br/> v.emplace_back("hello");             // Line A: "engage" v
+<br/> auto a1 = v.back().get_allocator();  // What is `a1`?
+<br/> v.pop_back();                        // v is "disengaged" again
+</tt>
+<p/>
+
+The behavior of Line A depends on whether <tt>SomeAlloc</tt> is scoped or not.  
+If it is, then <tt>e1.get_allocator()</tt> will be <tt>allocX</tt>, otherwise 
+<tt>e1.get_allocator()</tt> will be a default-constructed <tt>SomeAlloc</tt>.  Note that in the latter case, the 
+allocator used to construct <tt>v</tt> has no effect on the allocator used to construct <tt>a1</tt>. 
+ Moreover, let's look at what happens if we try to deliberately set the allocator of the engaged element:
+<p>
+<tt>SomeAlloc&lt;byte&gt; allocY("Y");
+<br/> v.emplace_back("hello", allocY);     // Line B "engage" v again
+<br/> auto a2 = v.back().get_allocator();  // `allocY` or bust!
+</tt>
+</p>
+If <tt>SomeAlloc</tt> is scoped, then Line B is ill-formed because the <tt>construct</tt> method of 
+<tt>SomeAlloc</tt> will try to pass itself to the constructed element twice. The whole point of a scoped allocator is 
+to ensure that the element gets the container's allocator.  Allowing the allocator to be set otherwise defeats the purpose.  
+On the other hand, if <tt>SomeAlloc</tt> is not scoped, then Line B is just fine, and a2 will be equal to <tt>allocY</tt>.  
+Once again, for the non-scoped case, the vector's allocator does not affect the engaged element's allocator, 
+whereas for the scoped case, they are enforced to be the same.
+
+Now, replace <tt>vector</tt> with <tt>basic_optional</tt>, <tt>emplace_back</tt> with <tt>emplace</tt>, and <tt>back</tt> with <tt>reset</tt>.  
+We believe the behavior should be identical.  However, if one really wants to pass a non-scoped allocator to the engaged element, then they can do this:
+<p>
+<tt>template &lt;class T&gt;
+<br/> using ScopedSomeAlloc = scoped_allocator_adaptor&lt;SomeAlloc&lt;T&gt;&gt;;
+<br/> basic_optional&lt;MyString, ScopedSomeAlloc&lt;MyString&gt;&gt; opt(allocX);  // Disenaged
+<br/> opt.emplace("hello");
+<br/> auto a3 = opt.value().get_allocator();
+<br/> assert(a3 == allocX);  // Guaranteed!
+</tt></p>
+This is good library design: the user gets to select the behavior by assembling multiple general-purpose components.
+
+Note that for <tt>pmr::polymorphic_allocator</tt>, the entire discussion is moot, as <tt>allocator_traits&lt;A&gt;::construct()</tt>  
+and uses-allocator construction are the same.
+ 
+
+</p>
 
 <h2>Feedback items for LEWG: </h2>
 
@@ -307,9 +380,10 @@ the number of constructors and assignment operators.
 <br/> 
 <br/> With the approach described above, the resulting allocator is determined by the 
 <tt>allocator_traits&lt;AllocB&gt;</tt> which are the same as <tt>allocator_traits&lt;AllocA&gt;</tt>.
-To ensure this is the case, and to keep the value_type allocator in sync with the basic_optiona allocator, 
-every operation which would modify the allocator according to 
-the <tt>allocator_traits&lt;AllocB&gt;</tt> needs to be implemented in terms of uses-allocator construction.
+To ensure this is the case, and to keep the value_type allocator in sync with the basic_optional allocator, 
+every operation which might modify the allocator according to 
+the <tt>allocator_traits&lt;AllocB&gt;</tt> needs to be implemented in terms of 
+ <tt>allocator_traits&lt;AllocB&gt;::construct()</tt>.
 <br/>
 <br/> Now consider :
 <br/>
@@ -388,8 +462,7 @@ wouldn't be.
   It is not all that obvious which allocator should be used for the
 	object returned by <tt>value_or</tt>. Should the decision be left to the type
   or should it be mandated by the optional ? That is, should the object
-  be constructed by plain copy/move construction or with uses-allocator 
-  construction?
+  be constructed by plain copy/move construction or with allocator_traits&lt;A&gt;::construct()?
   
 </p>
 <p><h3> Should assignments use <t>is_­constructible</t> trait ? </h3> </p>
@@ -1014,8 +1087,7 @@ When an instance of <i>optional</i>&lt;T&gt; contains a value, it means that an 
 is allocated within the storage of the <i>optional</i> object. Implementations are not permitted to use 
 additional storage, such as dynamic memory, to allocate its contained value. The contained value shall be allocated in a 
 region of the <i>optional</i>&lt;T&gt; storage suitably aligned for the type <tt>T</tt> and, if <tt>uses-poly-alloc</tt> is true,
-constructed by uses-allocator construction 
-with allocator <tt><i>alloc</i></tt>. When an object of type <i>optional</i>&lt;T&gt; is contextually 
+constructed with <tt><i>allocator_traits&lt;alloc&gt;::construct()</i></tt>. When an object of type <i>optional</i>&lt;T&gt; is contextually 
 converted to bool, the conversion returns true if the object contains a value; otherwise the conversion returns false.
 </ins></blockquote>
 <blockquote><ins>Member <tt>val</tt> is provided for exposition only. When an <i>optional</i>&lt;T&gt;
@@ -1047,7 +1119,7 @@ that meets the <i>Cpp17Destructible</i> requirements (Table 30).</ins></blockquo
 <br/>
 <br/><code>optional(const optional&amp;);</code>
 <br/><tab/><i>Effects:</i> If <tt>uses-poly-alloc</tt> is <tt>true</tt>, <tt><i>alloc</i></tt> is default initialized</tt>. 
-If <tt>rhs</tt> contains a value, constructs the contained value with uses-allocator construction ([allocator.uses.construction]) with <i>alloc</i> and 
+If <tt>rhs</tt> contains a value, constructs the contained value with <tt><i>allocator_traits&lt;alloc&gt;::construct()</i></tt> and 
 the expression <tt>*rhs</tt>.
 <br/><tab/><i>Ensures:</i> <tt>bool(rhs) == bool(*this)</tt>.
 <br/><tab/><i>Throws:</i> Any exception thrown by the selected constructor of <tt>T</tt>.
@@ -1056,7 +1128,7 @@ the expression <tt>*rhs</tt>.
 <br/>
 <br/><code>optional(optional&amp;&amp; rhs) noexcept(<i>see below</i>)</code>
 <br/><tab/><i>Effects:</i> If <tt>uses-poly-alloc</tt> is <tt>true</tt>, <tt><i>alloc</i></tt> is initialized with <tt>rhs.<i>alloc</i></tt>. 
-If <tt>rhs</tt> contains a value, constructs the contained value with uses-allocator construction ([allocator.uses.construction]) with <i>alloc</i> and 
+If <tt>rhs</tt> contains a value, constructs the contained value with <tt><i>allocator_traits&lt;alloc&gt;::construct()</i></tt> and 
 the expression <tt>std​::​move(*rhs)</tt>. <tt>bool(rhs)</tt> is unchanged.
 <br/><tab/><i>Ensures:</i> <tt>bool(rhs) == bool(*this)</tt>.
 <br/><tab/><i>Throws:</i> Any exception thrown by the selected constructor of <tt>T</tt>.
@@ -1074,8 +1146,8 @@ with the expression <tt>*rhs</tt>.
 <br/>
 <br/><code>optional(std::optional&amp;&amp; rhs)</code>
 <br/><tab/><i>Effects:</i> If <tt>uses-poly-alloc</tt> is <tt>true</tt>, <tt><i>alloc</i></tt> is initialized with <tt>rhs.<i>alloc</i></tt>. 
-If <tt>rhs</tt> contains a value, constructs the contained value with uses-allocator construction ([allocator.uses.construction]) 
-with <i>alloc</i> and the expression <tt>std​::​move(*rhs)</tt>. <tt>bool(rhs)</tt> is unchanged.
+If <tt>rhs</tt> contains a value, constructs the contained value with <tt><i>allocator_traits&lt;alloc&gt;::construct()</i></tt>
+ and the expression <tt>std​::​move(*rhs)</tt>. <tt>bool(rhs)</tt> is unchanged.
 <br/><tab/><i>Ensures:</i> <tt>bool(rhs) == bool(*this)</tt>.
 <br/><tab/><i>Throws:</i> Any exception thrown by the selected constructor of <tt>T</tt>.
 <br/><tab/><i>Mandates:</i><tt>is_­move_­constructible_­v&lt;T&gt;</tt> is true.
@@ -1084,7 +1156,7 @@ with <i>alloc</i> and the expression <tt>std​::​move(*rhs)</tt>. <tt>bool(rh
 <br/>
 <br/><code>template&lt;class... Args&gt; explicit optional(in_place_t, Args&amp;&amp;... args);</code>
 <br/><tab/><i>Effects:</i> If <tt>uses-poly-alloc</tt> is <tt>true</tt>, <tt><i>alloc</i></tt> is default initialized</tt>.  
-Constructs the contained value with uses-allocator construction ([allocator.uses.construction]) with <i>alloc</i> and <tt>std​::​forward&lt;Args&gt;(args)....</tt>. 
+Constructs the contained value with <tt><i>allocator_traits&lt;alloc&gt;::construct()</i></tt> and <tt>std​::​forward&lt;Args&gt;(args)....</tt>. 
 <br/><tab/><i>Ensures:</i> <tt>*this</tt> contains a value..
 <br/><tab/><i>Throws:</i> Any exception thrown by the selected constructor of <tt>T</tt>.
 <br/><tab/><i>Mandates:</i><tt>is_­copy_­constructible_­v&lt;T&gt;</tt> is true.
@@ -1092,14 +1164,14 @@ Constructs the contained value with uses-allocator construction ([allocator.uses
 <br/>
 <br/><code>template&lt;class... Args&gt; explicit optional(in_place_t, initializer_list&lt;U&gt; il, Args&amp;&amp;... args);</code>
 <br/><tab/><i>Effects:</i>  If <tt>uses-poly-alloc</tt> is <tt>true</tt>, <tt><i>alloc</i></tt> is default initialized</tt>. 
-Constructs the contained value with uses-allocator construction ([allocator.uses.construction]) with <i>alloc</i>, <tt>il, and std​::​forward&lt;Args&gt;(args)....</tt>.
+Constructs the contained value with <tt><i>allocator_traits&lt;alloc&gt;::construct()</i></tt>, <tt>il, and std​::​forward&lt;Args&gt;(args)....</tt>.
 <br/><tab/><i>Ensures:</i> <tt>*this</tt> contains a value..
 <br/><tab/><i>Throws:</i> Any exception thrown by the selected constructor of <tt>T</tt>.
 <br/><tab/><i>Mandates:</i><tt>is_­constructible_­v&lt;T, initializer_­list&lt;U&gt;&amp;, Args&amp;&amp;...&gt;</tt> is true.  
 <br/>
 <br/><code>template&lt;class U = T&gt; explicit(<i>see below</i>) optional(U&amp;&amp; rhs);</code>
 <br/><tab/><i>Effects:</i>If <tt>uses-poly-alloc</tt> is <tt>true</tt>, <tt><i>alloc</i></tt> is default initialized</tt>.
-Constructs the contained value with uses-allocator construction ([allocator.uses.construction]) with <i>alloc</i> and <tt> std​::​forward&lt;U&gt;(rhs)</tt>. 
+Constructs the contained value with <tt><i>allocator_traits&lt;alloc&gt;::construct()</i></tt> and <tt> std​::​forward&lt;U&gt;(rhs)</tt>. 
 <br/><tab/><i>Ensures:</i> <tt>*this</tt> contains a value.
 <br/><tab/><i>Throws:</i> Any exception thrown by the selected constructor of <tt>T</tt>.
 <br/><tab/><i>Remarks:</i>The expression inside <tt>explicit</tt> is equivalent to:
@@ -1113,8 +1185,7 @@ is <tt>false</tt>, and
 <br/>
 <br/><code>template&lt;class U&gt; explicit(<i>see below</i>) optional(const optional&lt;U&gt;&amp; rhs);</code>
 <br/><tab/><i>Effects:</i>If <tt>uses-poly-alloc</tt> is <tt>true</tt>, <tt><i>alloc</i></tt> is default initialized</tt>. 
-If <tt>rhs</tt> contains a value, constructs the contained value with uses-allocator construction ([allocator.uses.construction]) 
-with <i>alloc</i> and <tt>*rhs</tt>. 
+If <tt>rhs</tt> contains a value, constructs the contained value with <tt><i>allocator_traits&lt;alloc&gt;::construct()</i></tt> and <tt>*rhs</tt>. 
 <br/><tab/><i>Ensures:</i> <tt>bool(rhs) == bool(*this)</tt>.
 <br/><tab/><i>Throws:</i> Any exception thrown by the selected constructor of <tt>T</tt>.
 <br/><tab/><i>Remarks:</i>The expression inside <tt>explicit</tt> is equivalent to:
@@ -1143,8 +1214,8 @@ with <i>alloc</i> and <tt>*rhs</tt>.
 <br/>
 <br/><code>template&lt;class U&gt; explicit(<i>see below</i>) optional(optional&lt;U&gt;&amp;&amp; rhs);</code>
 <br/><tab/><i>Effects:</i>If <tt>uses-poly-alloc</tt> is <tt>true</tt>, <tt><i>alloc</i></tt> is default initialized</tt>.
-If <tt>rhs</tt> contains a value, constructs the contained value with uses-allocator construction ([allocator.uses.construction]) 
-with <i>alloc</i> and <tt>std​::​move(*rhs)</tt>. <tt>bool(rhs)</tt> is unchanged.
+If <tt>rhs</tt> contains a value, constructs the contained value with <tt><i>allocator_traits&lt;alloc&gt;::construct()</i></tt>
+ and <tt>std​::​move(*rhs)</tt>. <tt>bool(rhs)</tt> is unchanged.
 <br/><tab/><i>Ensures:</i> <tt>bool(rhs) == bool(*this)</tt>.
 <br/><tab/><i>Throws:</i> Any exception thrown by the selected constructor of <tt>T</tt>.
 <br/><tab/><i>Remarks:</i>The expression inside <tt>explicit</tt> is equivalent to:
@@ -1172,8 +1243,8 @@ with <i>alloc</i> and <tt>std​::​move(*rhs)</tt>. <tt>bool(rhs)</tt> is unch
 <br/>
 <br/><code>template&lt;class U&gt; explicit(<i>see below</i>) optional(const std::optional&lt;U&gt;&amp; rhs);</code>
 <br/><tab/><i>Effects:</i>If <tt>uses-poly-alloc</tt> is <tt>true</tt>, <tt><i>alloc</i></tt> is default initialized</tt>.
-If <tt>rhs</tt> contains a value, constructs the contained value with uses-allocator construction ([allocator.uses.construction]) 
-with <i>alloc</i> and <tt>*rhs</tt>. 
+If <tt>rhs</tt> contains a value, constructs the contained value with <tt><i>allocator_traits&lt;alloc&gt;::construct()</i></tt>
+ and <tt>*rhs</tt>. 
 <br/><tab/><i>Ensures:</i> <tt>bool(rhs) == bool(*this)</tt>.
 <br/><tab/><i>Throws:</i> Any exception thrown by the selected constructor of <tt>T</tt>.
 <br/><tab/><i>Remarks:</i>The expression inside <tt>explicit</tt> is equivalent to:
@@ -1203,8 +1274,8 @@ with <i>alloc</i> and <tt>*rhs</tt>.
 <br/><code>template&lt;class U&gt; explicit(<i>see below</i>) optional(std::optional&lt;U&gt;&amp;&amp; rhs);</code>
 <br/><tab/><i>Effects:</i>If <tt>uses-poly-alloc</tt>
  is <tt>true</tt>, <tt><i>alloc</i></tt> is default initialized</tt>. 
-If <tt>rhs</tt> contains a value, constructs the contained value with uses-allocator construction ([allocator.uses.construction]) 
-with <i>alloc</i> and <tt>std​::​move(*rhs)</tt>. 
+If <tt>rhs</tt> contains a value, constructs the contained value with <tt><i>allocator_traits&lt;alloc&gt;::construct()</i></tt>
+ and <tt>std​::​move(*rhs)</tt>. 
 <tt>bool(rhs)</tt> is unchanged.
 <br/><tab/><i>Ensures:</i> <tt>bool(rhs) == bool(*this)</tt>.
 <br/><tab/><i>Throws:</i> Any exception thrown by the selected constructor of <tt>T</tt>.
@@ -1291,8 +1362,7 @@ no effect.
 <td><ins>assigns <tt>*rhs</tt> to the contained value</ins></td>
 <td><ins>initializes the contained value with <tt>*rhs</tt>. 
 If <tt>uses-poly-alloc</tt>
- is <tt>true</tt>, initialization is done by uses-allocator construction 
-with allocator <tt><i>alloc</i></tt> </ins></td>
+ is <tt>true</tt>, initialization is done with <tt><i>allocator_traits&lt;alloc&gt;::construct()</i></tt></td>
 </tr>
 <tr>
 <td><ins><tt>rhs</tt> does not contain a value</ins></td>
@@ -1325,8 +1395,7 @@ This operator shall be defined as deleted unless <tt>is_­copy_­constructible_�
 <td><ins>assigns <tt>std​::​move(*rhs)</tt> to the contained value</ins></td>
 <td><ins>initializes the contained value with <tt>std​::​move(*rhs)</tt>. 
 If <tt>uses-poly-alloc</tt>
- is <tt>true</tt>, initialization is done by uses-allocator construction 
-with allocator <tt><i>alloc</i></tt> </ins></td>
+ is <tt>true</tt>, initialization is done with <tt><i>allocator_traits&lt;alloc&gt;::construct()</i></tt> </ins></td>
 </tr>
 <tr>
 <td><ins><tt>rhs</tt> does not contain a value</ins></td>
@@ -1350,8 +1419,7 @@ the state of <tt>*val</tt> and <tt>*rhs.val</tt> is determined by the exception 
 <br/><code>template&lt;class U = T&gt; optional&amp; operator=(U&amp;&amp; v);</code>
 <br/><tab/><i>Effects:</i> If <tt>*this</tt> contains a value, assigns <tt>std​::​forward&lt;U&gt;(v)</tt> to the contained value;
 otherwise initializes the contained value with <tt>std​::​forward&lt;U&gt;(v)</tt>. If <tt>uses-poly-alloc</tt>
- is <tt>true</tt>, initialization is done by uses-allocator construction
-with allocator <tt><i>alloc</i></tt>
+ is <tt>true</tt>, initialization is done with <tt><i>allocator_traits&lt;alloc&gt;::construct()</i></tt>
 <br/><tab/><i>Returns:</i> <tt>*this</tt>.
 <br/><tab/><i>Ensures:</i> <tt>*this</tt> contains a value.
 <br/><tab/><i>Remarks: If any exception is thrown, the result of the expression <tt>bool(*this)</tt> remains unchanged.
@@ -1380,8 +1448,7 @@ the state of <tt>*val</tt> and <tt>v</tt> is determined by the exception safety 
 <td><ins>assigns <tt>*rhs</tt> to the contained value</ins></td>
 <td><ins>initializes the contained value with <tt>*rhs</tt>.
 If <tt>uses-poly-alloc</tt>
- is <tt>true</tt>, initialization is done by uses-allocator construction 
-with allocator <tt><i>alloc</i></tt> </ins></td>
+ is <tt>true</tt>, initialization is done with <tt><i>allocator_traits&lt;alloc&gt;::construct()</i></tt> </ins></td>
 </tr>
 <tr>
 <td><ins><tt>rhs</tt> does not contain a value</ins></td>
@@ -1440,8 +1507,7 @@ to <tt>T</tt>'s assignment, the state of <tt>*val</tt>  is determined by the exc
 <td><ins>assigns <tt> std​::​move(*rhs)</tt> to the contained value</ins></td>
 <td><ins>initializes the contained value with <tt> std​::​move(*rhs)</tt>.
 If <tt>uses-poly-alloc</tt>
- is <tt>true</tt>, initialization is done by uses-allocator construction 
-with allocator <tt><i>alloc</i></tt>.</ins></td>
+ is <tt>true</tt>, initialization is done with <tt><i>allocator_traits&lt;alloc&gt;::construct()</i></tt>.</ins></td>
 </tr>
 <tr>
 <td><ins><tt>rhs</tt> does not contain a value</ins></td>
@@ -1499,8 +1565,7 @@ to <tt>T</tt>'s assignment, the state of <tt>*val</tt>  is determined by the exc
 <td><ins>assigns <tt>*rhs</tt> to the contained value</ins></td>
 <td><ins>initializes the contained value with <tt>*rhs</tt>.
 If <tt>uses-poly-alloc</tt>
- is <tt>true</tt>, initialization is done by uses-allocator construction 
-with allocator <tt><i>alloc</i></tt> .</ins></td>
+ is <tt>true</tt>, initialization is done with <tt><i>allocator_traits&lt;alloc&gt;::construct()</i></tt>.</ins></td>
 </tr>
 <tr>
 <td><ins><tt>rhs</tt> does not contain a value</ins></td>
@@ -1560,8 +1625,7 @@ the state of <tt>*val</tt> and <tt>*rhs.val</tt> is determined by the exception 
 <td><ins>assigns <tt>*rhs</tt> to the contained value</ins></td>
 <td><ins>initializes the contained value with <tt>*rhs</tt>.
 If <tt>uses-poly-alloc</tt>
- is <tt>true</tt>, initialization is done by uses-allocator construction 
-with allocator <tt><i>alloc</i></tt> </ins></td>
+ is <tt>true</tt>, initialization is done with <tt><i>allocator_traits&lt;alloc&gt;::construct()</i></tt> </ins></td>
 </tr>
 <tr>
 <td><ins><tt>rhs</tt> does not contain a value</ins></td>
@@ -1610,8 +1674,7 @@ the state of <tt>*val</tt> and <tt>*rhs.val</tt> is determined by the exception 
 <br/><tab/><i>Constraints:</i> <tt>is_­constructible_­v&lt;T, Args&amp;&amp;...&gt; </tt>is true.
 <br/><tab/><i>Effects:</i> Calls <tt>*this = nullopt</tt>. Then initializes the contained value 
 with <tt>std​::​forward&lt;Args&gt;(args)....</tt>. If <tt>uses-poly-alloc</tt>
- is <tt>true</tt>, initialization is done by uses-allocator construction 
-with allocator <tt><i>alloc</i></tt>.
+ is <tt>true</tt>, initialization is done with <tt><i>allocator_traits&lt;alloc&gt;::construct()</i></tt>.
 <br/><tab/><i>Ensures:</i> <tt>*this</tt> contains a value.
 <br/><tab/><i>Returns:</i> A reference to the new contained value.
 <br/><tab/><i>Throws:</i> Any exception thrown by the selected constructor of <tt>T</tt>.
@@ -1624,8 +1687,7 @@ with allocator <tt><i>alloc</i></tt>.
 <br/><tab/><i>Constraints:</i> <tt>is_­constructible_­v&lt;T, initializer_­list&lt;U&gt;&amp;, Args&amp;&amp;...&gt; </tt>is true.
 <br/><tab/><i>Effects:</i> Calls <tt>*this = nullopt</tt>. Then initializes the contained value 
 with <tt>il</tt> and <tt> std​::​forward&lt;Args&gt;(args)....</tt>. If <tt>uses-poly-alloc</tt>
- is <tt>true</tt>, initialization is done by uses-allocator construction 
-with allocator <tt><i>alloc</i></tt>.
+ is <tt>true</tt>, initialization is done with <tt><i>allocator_traits&lt;alloc&gt;::construct()</i></tt>.
 <br/><tab/><i>Ensures:</i> <tt>*this</tt> contains a value.
 <br/><tab/><i>Returns:</i> A reference to the new contained value.
 <br/><tab/><i>Throws:</i> Any exception thrown by the selected constructor of <tt>T</tt>.
@@ -1663,8 +1725,7 @@ of <tt>T</tt>’s move constructor.
 <td><ins>initializes the contained value with
 <tt>std​::​move(*rhs)</tt> as the constructor argument, followed by <tt>rhs.val->T​::​~T()</tt>;
 If <tt>uses-poly-alloc</tt>
- is <tt>true</tt>, initialization is done by uses-allocator construction 
-with allocator <tt><i>alloc</i></tt>.
+ is <tt>true</tt>, initialization is done with <tt><i>allocator_traits&lt;alloc&gt;::construct()</i></tt>.
 Postcondition is that <tt>*this</tt> contains a value and <tt>rhs</tt> does not contain a value</ins></td>
 </tr>
 <tr>
@@ -1672,8 +1733,7 @@ Postcondition is that <tt>*this</tt> contains a value and <tt>rhs</tt> does not 
 <td><ins>initializes the contained value with
 <tt>std​::​move(*(*this))</tt> as the constructor argument, followed by <tt>val->T​::​~T()</tt>; 
 If <tt>uses-poly-alloc</tt>
- is <tt>true</tt>, initialization is done by uses-allocator construction 
-with allocator <tt><i>alloc</i></tt>.
+ is <tt>true</tt>, initialization is done with <tt><i>allocator_traits&lt;alloc&gt;::construct()</i></tt>.
 Postcondition is that <tt>*this</tt> does not contain a value and <tt>rhs</tt> contains a value</ins></tt></ins></td>
 <td><ins>no effect</ins></td>
 </tr>
@@ -1746,10 +1806,10 @@ the program is ill-formed.
 <br/>
 <br/><tt>    template&lt;class U&gt; T value_or(allocator_arg_t, const polymorphic_allocator&lt;&gt;&amp; a, U&amp;&amp; v) const&amp;;</tt>tt>
 <br/><tab/><i>Constraints:</i> <tt>uses_allocator&lt;T,polymorphic_allocator&lt;&gt;&gt;</tt> is true;
-<br/><tab/><i>Effects:</i> if <tt>*this</tt> contains a value, returns an object of type <tt>T</tt> initialized by
-uses-allocator construction with allocator <tt>a</tt> and <tt>**this</tt> as the constructor argument.
-Otherwise, returns an object of type <tt>T</tt> initialized by
-uses-allocator construction with allocator <tt>a</tt> and <tt>std::forward&lt;U&gt;(v)</tt> as the constructor argument.
+<br/><tab/><i>Effects:</i> if <tt>*this</tt> contains a value, returns an object of type <tt>T</tt> 
+initialized with <tt><i>allocator_traits&lt;a&gt;::construct()</i></tt> and <tt>**this</tt> as the constructor argument.
+Otherwise, returns an object of type <tt>T</tt> initialized
+with <tt><i>allocator_traits&lt;a&gt;::construct()</i></tt> and <tt>std::forward&lt;U&gt;(v)</tt> as the constructor argument.
 <br/><tab/><i>Remarks:</i> If <tt>is_­copy_­constructible_­v&lt;T&gt;
 && is_­convertible_­v&lt;U&amp;&amp;, T&gt;</tt> is <tt>false</tt>,
 the program is ill-formed.
@@ -1757,10 +1817,10 @@ the program is ill-formed.
 <br/>
 <br/><tt>    template&lt;class U&gt; T value_or(allocator_arg_t, const polymorphic_allocator&lt;&gt;&amp; a, U&amp;&amp; v) &amp;&amp;;</tt>
 <br/><tab/><i>Constraints:</i> <tt>uses_allocator&lt;T,polymorphic_allocator&lt;&gt;&gt;</tt> is true;
-<br/><tab/><i>Effects:</i> if <tt>*this</tt> contains a value, returns an object of type <tt>T</tt> initialized by
-uses-allocator construction with allocator <tt>a</tt> and <tt>std::move(**this)</tt> as the constructor argument.
-Otherwise, returns an object of type <tt>T</tt> initialized by
-uses-allocator construction with allocator <tt>a</tt> and <tt>std::forward&lt;U&gt;(v)</tt> as the constructor argument.
+<br/><tab/><i>Effects:</i> if <tt>*this</tt> contains a value, returns an object of type <tt>T</tt> initialized 
+with <tt><i>allocator_traits&lt;a&gt;::construct()</i></tt> and <tt>std::move(**this)</tt> as the constructor argument.
+Otherwise, returns an object of type <tt>T</tt> initialized with <tt><i>allocator_traits&lt;a&gt;::construct()</i></tt>
+ and <tt>std::forward&lt;U&gt;(v)</tt> as the constructor argument.
 <br/><tab/><i>Remarks:</i> If <tt>is_­copy_­constructible_­v&lt;T&gt;
 && is_­convertible_­v&lt;U&amp;&amp;, T&gt;</tt> is <tt>false</tt>,
 the program is ill-formed.
