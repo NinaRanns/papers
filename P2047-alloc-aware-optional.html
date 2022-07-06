@@ -133,12 +133,13 @@ do any allocation, and that the name is not appropriate
   each type the optional is engaged.  However, when holding a non-AA type,
   there is no reason to pay the overhead of storing an allocator, nor to
   support the AA constructor interface. For this
-  reason, <tt>std::pmr::optional</tt></p> has a different specialisation for AA and
+  reason, <tt>std::pmr::optional</tt> has a different specialisation for AA and
   non-AAtype. 
+ </p>
 
 <h2>Design decisions:</h2>
 <p>
-  Rather than support the entire C++11-style set
+  Rather than support the entire set of allocator types allowed for C++20 containers
   allocators, <tt>std::pmr::optional</tt> works only
   with <tt>std::pmr::polymorphic_allocator</tt>. The design keeps the allocator
   from infecting the optional's type, in the sense that it's not a template
@@ -149,21 +150,16 @@ do any allocation, and that the name is not appropriate
   the size of the type.
 </p>
 
-<p>
+<!--  <p>
   When prototyping this proposal, we realized that an allocator-aware
-  optional is never trivially copyable. Copy constructor and copy
+  optional is never trivially copyable. Copy construction and copy
   assignment always potentially invoke the allocator; these operations
   are never bitwise copies. Move operations aren't trivial either, because
   they may also end up doing uses-allocator construction.
-</p>
-<p>
-  This was an implementation-based reason for having an allocator-aware
-  type separate from the usual optional. All the complexity of conditional
-  triviality is in <tt>std::optional</tt>, and <tt>std::pmr::optional</tt>'s allocator-aware
-  alias target has none of that. </p>
+</p> -->
   
 <p>
-	The first proposal suggested using a type alias where a non-AA <tt>std::pmr::optional</tt>
+	An early draft of this proposal suggested using a type alias where a non-AA <tt>std::pmr::optional</tt>
 	aliases <tt>std::optional</tt>, and AA <tt>std::pmr::optional</tt> aliases a new unnamed type. 
   However, this causes usability issues. Type deduction in cases like :
 <br/><tt>
@@ -188,7 +184,7 @@ P0178 (http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2016/p0178r0.html)
 
 <h2>Feedback items for LEWG: </h2>
 
-<p><h3>Should <tt>std::pmr::optional</tt> be a more allocator generic type  </h3></p>
+<p><h3>Should <tt>std::pmr::optional</tt> be a more allocator generic type ? </h3></p>
 <p>
   In the reflector discussion, Ville Voutilainen and Tomasz Kamińskimasz made the following request : ": The C++ standard library should 
   provide building blocks that allow multiple semantics to be expressed, as opposed to deciding on a narrow subset, 
@@ -206,7 +202,7 @@ P0178 (http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2016/p0178r0.html)
 <br/>Furthermore, <tt>pmr::optional&lt;T&gt;</tt> would be <tt>basic_optional&lt;T, std::pmr::polymorphic_allocator&lt;&gt;&gt;</tt>
 </p>
 <p>
-<br/> Such <tt>basic_optional</tt> would be "allocator aware" even for types that use an allocator which is not an <tt>std::pmr::polymorphic_allocator</tt>.
+<br/> Such <tt>basic_optional</tt> would be "allocator aware" even for types that use an allocator other than <tt>std::pmr::polymorphic_allocator</tt>.
  Users of allocators with different propagation traits to <tt>std::pmr::polymorphic_allocator</tt> would not be required to write their own
  allocator aware optional implementations as basic_optional would respect the propagation traits of the allocator used, and could be used
  with allocator aware containers like vector "out of the box". These users are not theoretical. In his feedback, Ville Voutilainen writes :
@@ -230,7 +226,61 @@ propagation traits that are different from the ones of
 std::polymorphic_allocator." </i>
   
 </p>
-<p> Such approach adds complexity to the design and reasoning about what happens. 
+<p>
+One could argue that it makes no sense for such a propagating allocator to be a scoped allocator and vice versa.  
+Scoped allocators exist for the purpose of ensuring consistency between a container and its contained elements' allocator.  
+A propagating allocator is used in exactly those situations where such consistency is not required and might be undesirable. 
+ Consider the vector case with a propagating, non-scoped allocator:
+<br/>
+<br/>
+<tt>template &lt;class T&gt;
+<br/>class PropAlloc
+<br/>{
+<br/><tab/>  public:
+<br/><tab/>    ...
+<br/><tab/>    using propagate_on_container_copy_assignment = std::true_type;
+<br/><tab/>    using propagate_on_container_move_assignment = std::true_type;
+<br/><tab/>    using propagate_on_container_swap            = std::true_type;
+<br/>};
+<br/>
+<br/>using MyString = std::string&lt;char, std::char_traits&lt;char&gt;, PropAlloc&lt;char&gt;&gt;;
+<br/>using MyVector = std::vector&lt;MyString, PropAlloc&lt;MyString&gt;&gt;;
+<br/>
+<br/>PropAlloc allocA(1);
+<br/>PropAlloc allocB(2);
+<br/>
+<br/>MyVector v(allocA);
+<br/>v.push_back("hello");
+<br/>v[0] = MyString("goodbye", allocB);
+<br/>assert(allocA == v.get_allocator());
+<br/>assert(allocB == v[0].get_allocator());
+</tt>
+<br/>
+<br/>Note that, by design, the vector and its elements do not share an allocator.  
+There is nothing wrong with that, but it is not the scoped allocator model.  Now, let's do the same with optional:
+<br/>
+<tt>
+<br/>using MyOptional = std::basic_optional&lt;MyString, PropAlloc&lt;char&gt;&gt;;
+<br/>MyOptional opt(std::allocator_arg_t, allocA, MyString("hello"));
+<br/>opt = MyString("goodbye", allocB);
+<br/>assert(allocA == opt.get_allocator());
+<br/>assert(allocB == opt.value().get_allocator());
+</tt>
+<br/>
+<br/>
+The behavior mimics the vector case, so what's the problem?  
+The problem is "what's the purpose of storing an allocator in optional in the first place?"  
+For vector, the allocator is used by the vector itself to allocate memory.  
+For optional, however, the optional object does not allocate memory, so has no use for an allocator.  
+It stores it for use by the value object, but if the value object's allocator 
+isn't consistent with the optional, then it seems to have no real purpose.  
+Instead, the allocator for the value can be passed directly into the emplace functions,
+using the existing mechanisms. However, one can conceive a scoped allocator 
+that is not polymorphic and might even use fancy pointer types. 
+Having `basic_optional` does give flexibility to support that.
+</p>
+
+<p> Such approach adds some complexity to the design and reasoning about what happens. 
 Consider:
 <br/>
 <tt>
@@ -277,8 +327,24 @@ the case is presented for the purposes of documenting that it has been considere
 do not allow for allocator to change after the object has been created. Similarly, because only one allocator family is supported, there is no need
 to consider cases where the rhs allocator is of an unrelated type. However, the application of the current design is limited to a subset of 
 users of allocator aware standard containers. This in turn means that the problem this paper is trying to solve (i.e. creating an allocator
-aware optional type) would not be solved for all users of an allocator aware <tt>vector</tt>.
+aware optional type) would not be solved for all users of an allocator aware <tt>vector</tt>. If we can express the semantics of the current design 
+in terms of the propagation traits of <tt>std::pmr::polymorphic_allocator&lt;&gt;</tt>, then we can easily extend the design to cover other propagation traits. 
+The remaining work is deciding what to do with allocators that are unrelated and perhaps even non-convertible. For such questions, there's an approach 
+that's forward-compatible and allows relaxations/extensions in the future. 
 </p>
+
+We are not aware of such users, but the case is presented for the purposes of documenting that it has been considered.
+
+The application of the current design is limited to a subset of users of allocator aware standard containers. 
+Users who need allocators with propagation traits that are different to that of <tt>std::pmr::polymorphic_allocator&lt;&gt;</tt>
+would still need to write their own alllocator aware optional. If we can express the semantics of the current design 
+in terms of the propagation traits of std::polymorphic_allocator, then we can easily extend the design to cover 
+other propagation traits. The remaining work is deciding what to do with allocators that are unrelated and
+perhaps even non-convertible. For such questions, there's an approach that's forward-compatible and allows 
+relaxations/extensions in the future.
+
+
+
 
 	<h3>Should <tt>std::pmr::optional</tt> be placed in the <tt>&lt;optional&gt;</tt> header?
 </h3>
