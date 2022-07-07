@@ -90,7 +90,8 @@ do any allocation, and that the name is not appropriate
 <br/>R3:
 <br/>- replaced instances of <i>M_alloc</i> with <i>alloc</i>
 <br/>- clarified pmr::optional constructor descriptions to call out uses-allocator construction
-
+<br/>- expanded <tt>basic_optional</tt> discussion
+ 
 <h2>Motivation and Proposal Summary</h2>
 <p>
   C++ has been moving towards a consistent PMR allocator model whereby
@@ -176,7 +177,7 @@ do any allocation, and that the name is not appropriate
 <br/><tab2/><tab2/><tab2/>std::optional&lt;T&gt;&gt;:type);
 <br/></tt>
 <br/> 
-and using the nested <tt>type</tt> of the <tt>std::conditional</tt> as the function template parameter  made for an undeduced context.
+and using the nested <tt>type</tt> of the <tt>std::condigit logtional</tt> as the function template parameter  made for an undeduced context.
 </p>
   
 <br/>The free swap function has been made to have a wide contract and work with different allocators, as discussed in 
@@ -325,26 +326,19 @@ the case is presented for the purposes of documenting that it has been considere
 </p>
 <p> The issues discussed above are avoided in the current design because allocator traits of <tt>std::pmr::polymorphic_allocator&lt;&gt;</tt>
 do not allow for allocator to change after the object has been created. Similarly, because only one allocator family is supported, there is no need
-to consider cases where the rhs allocator is of an unrelated type. However, the application of the current design is limited to a subset of 
-users of allocator aware standard containers. This in turn means that the problem this paper is trying to solve (i.e. creating an allocator
-aware optional type) would not be solved for all users of an allocator aware <tt>vector</tt>. If we can express the semantics of the current design 
-in terms of the propagation traits of <tt>std::pmr::polymorphic_allocator&lt;&gt;</tt>, then we can easily extend the design to cover other propagation traits. 
-The remaining work is deciding what to do with allocators that are unrelated and perhaps even non-convertible. For such questions, there's an approach 
-that's forward-compatible and allows relaxations/extensions in the future. 
-</p>
-
-We are not aware of such users, but the case is presented for the purposes of documenting that it has been considered.
-
-The application of the current design is limited to a subset of users of allocator aware standard containers. 
+to consider cases where the rhs allocator is of an unrelated type. However, the application of the current design is limited to a 
+subset of users of allocator aware standard containers. 
 Users who need allocators with propagation traits that are different to that of <tt>std::pmr::polymorphic_allocator&lt;&gt;</tt>
 would still need to write their own alllocator aware optional. If we can express the semantics of the current design 
 in terms of the propagation traits of std::polymorphic_allocator, then we can easily extend the design to cover 
 other propagation traits. The remaining work is deciding what to do with allocators that are unrelated and
 perhaps even non-convertible. For such questions, there's an approach that's forward-compatible and allows 
 relaxations/extensions in the future.
+</p>
 
-
-
+If we decide to pursue basic_optional, we need to decide whether we want to support non-scoped propagating allocators. 
+That is, should the construction of the value_type element be done using uses-allocator construction or directly 
+through <tt>allocator_traits&lt;alloc&gt;::construct()</tt>. 
 
 	<h3>Should <tt>std::pmr::optional</tt> be placed in the <tt>&lt;optional&gt;</tt> header?
 </h3>
