@@ -24,7 +24,7 @@
 <body>
 
 <address align=right>
-Document number: P2047R1
+Document number: P2047R3
 <br/>
 Audience: LEWG
 <br/>
@@ -32,7 +32,7 @@ Audience: LEWG
 <a href="mailto:ville.voutilainen@gmail.com">Ville Voutilainen</a><br/>
 <a href="mailto:dinka.ranns@gmail.com">Nina Dinka Ranns</a><br/>
 <a href="mailto:phalpern@halpernwightsoftware.com">Pablo Halpern</a><br/>
-2021-02-17<br/>
+2022-07-06<br/>
 </address>
 <hr/>
 <h1 align=center>An allocator-aware optional type</h1>
@@ -83,11 +83,15 @@ do any allocation, and that the name is not appropriate
 <br/>- added CTAD specification
 <br/>- modified the specification of <tt>std::pmr::optional</tt> to be expressed in terms of 
 	<tt>std::pmr::polymorphic_allocator&lt;&gt;</tt>, as opposed to <tt>std::pmr::memory_resource</tt>
-gt;</p>
+</p>
 <br/>- moved <tt>std::pmr::optional</tt> to <tt>optional</tt> header as discussed in the reflector discussion
 <br/>- added request for discussion on making <tt>std::pmr::optional</tt> a more allocator generic type.
 <br/>- added free swap function to be in line with P0178 
-
+<br/>R3:
+<br/>- replaced instances of <i>M_alloc</i> with <i>alloc</i>
+<br/>- clarified pmr::optional constructor descriptions to call out uses-allocator construction
+<br/>- expanded <tt>basic_optional</tt> discussion
+ 
 <h2>Motivation and Proposal Summary</h2>
 <p>
   C++ has been moving towards a consistent PMR allocator model whereby
@@ -115,7 +119,7 @@ gt;</p>
   violating a key invariant of PMR containers. If one of the elements of the
   vector became disengaged and re-engaged, for example, the allocator for that
   one element could change.
-/p>
+</p>
 <p>
   The <tt>std::pmr::optional</tt> class template proposed here properly adheres to
   the rules of an AA type when instantiated with an AA value type. It holds a
@@ -130,12 +134,13 @@ gt;</p>
   each type the optional is engaged.  However, when holding a non-AA type,
   there is no reason to pay the overhead of storing an allocator, nor to
   support the AA constructor interface. For this
-  reason, <tt>std::pmr::optional</tt></p> has a different specialisation for AA and
+  reason, <tt>std::pmr::optional</tt> has a different specialisation for AA and
   non-AAtype. 
+ </p>
 
 <h2>Design decisions:</h2>
 <p>
-  Rather than support the entire C++11-style set
+  Rather than support the entire set of allocator types allowed for C++20 containers
   allocators, <tt>std::pmr::optional</tt> works only
   with <tt>std::pmr::polymorphic_allocator</tt>. The design keeps the allocator
   from infecting the optional's type, in the sense that it's not a template
@@ -146,21 +151,16 @@ gt;</p>
   the size of the type.
 </p>
 
-<p>
+<!--  <p>
   When prototyping this proposal, we realized that an allocator-aware
-  optional is never trivially copyable. Copy constructor and copy
+  optional is never trivially copyable. Copy construction and copy
   assignment always potentially invoke the allocator; these operations
   are never bitwise copies. Move operations aren't trivial either, because
   they may also end up doing uses-allocator construction.
-</p>
-<p>
-  This was an implementation-based reason for having an allocator-aware
-  type separate from the usual optional. All the complexity of conditional
-  triviality is in <tt>std::optional</tt>, and <tt>std::pmr::optional</tt>'s allocator-aware
-  alias target has none of that. </p>
+</p> -->
   
 <p>
-	The first proposal suggested using a type alias where a non-AA <tt>std::pmr::optional</tt>
+	An early draft of this proposal suggested using a type alias where a non-AA <tt>std::pmr::optional</tt>
 	aliases <tt>std::optional</tt>, and AA <tt>std::pmr::optional</tt> aliases a new unnamed type. 
   However, this causes usability issues. Type deduction in cases like :
 <br/><tt>
@@ -177,7 +177,7 @@ gt;</p>
 <br/><tab2/><tab2/><tab2/>std::optional&lt;T&gt;&gt;:type);
 <br/></tt>
 <br/> 
-and using the nested <tt>type</tt> of the <tt>std::conditional</tt> as the function template parameter  made for an undeduced context.
+and using the nested <tt>type</tt> of the <tt>std::condigit logtional</tt> as the function template parameter  made for an undeduced context.
 </p>
   
 <br/>The free swap function has been made to have a wide contract and work with different allocators, as discussed in 
@@ -185,8 +185,162 @@ P0178 (http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2016/p0178r0.html)
 
 <h2>Feedback items for LEWG: </h2>
 
+<p><h3>Should <tt>std::pmr::optional</tt> be a more allocator generic type ? </h3></p>
 <p>
-	<h3>Should <tt>std::pmr::optional</tt> be placed in the <tt>&lt;optional&gt;</tt> header?</p>
+  In the reflector discussion, Ville Voutilainen and Tomasz Kamińskimasz made the following request : ": The C++ standard library should 
+  provide building blocks that allow multiple semantics to be expressed, as opposed to deciding on a narrow subset, 
+  and making an allocator-aware optional obey the static properties, namely the propagation traits, of an allocator is a fundamental piece of such genericity.
+  See P2080 https://wg21.link/P2080"
+  
+</p>
+<p>
+<br/>  
+  This approach would consist of a basic_optional type :
+<br/>
+<br/>  <tt> template &lt;class T, class Alloc&gt
+<br/>       basic_optional&lt;T, Alloc&gt;</tt>  
+<br/> 
+<br/>Furthermore, <tt>pmr::optional&lt;T&gt;</tt> would be <tt>basic_optional&lt;T, std::pmr::polymorphic_allocator&lt;&gt;&gt;</tt>
+</p>
+<p>
+<br/> Such <tt>basic_optional</tt> would be "allocator aware" even for types that use an allocator other than <tt>std::pmr::polymorphic_allocator</tt>.
+ Users of allocators with different propagation traits to <tt>std::pmr::polymorphic_allocator</tt> would not be required to write their own
+ allocator aware optional implementations as basic_optional would respect the propagation traits of the allocator used, and could be used
+ with allocator aware containers like vector "out of the box". These users are not theoretical. In his feedback, Ville Voutilainen writes :
+<br/>
+<br/><tab/> <i>"I have resource-constrained (read "embedded" if you like) scenarios where I
+need to specify a memory arena that a particular software component uses. All
+allocator-aware things in that component need
+to use the same arena, and it's much preferred if the same arena is
+used by default, instead of having to specify it
+explicity as an exception to the default. For that to happen, SOCCC
+needs to return the same allocator, not create
+a fresh new one, and POCMA needs to be true. I can't solve this with a
+per-thread default resource, there are multiple
+separate components running on the same thread, using separate memory arenas.
+
+Our pmr::memory_resource works fine for such scenarios. Our
+std::polymorphic_allocator does not. Our containers
+work fine, because they obey the propagation traits. New facilities
+don't work in such scenarios if they don't support
+propagation traits that are different from the ones of
+std::polymorphic_allocator." </i>
+  
+</p>
+<p>
+One could argue that it makes no sense for such a propagating allocator to be a scoped allocator and vice versa.  
+Scoped allocators exist for the purpose of ensuring consistency between a container and its contained elements' allocator.  
+A propagating allocator is used in exactly those situations where such consistency is not required and might be undesirable. 
+ Consider the vector case with a propagating, non-scoped allocator:
+<br/>
+<br/>
+<tt>template &lt;class T&gt;
+<br/>class PropAlloc
+<br/>{
+<br/><tab/>  public:
+<br/><tab/>    ...
+<br/><tab/>    using propagate_on_container_copy_assignment = std::true_type;
+<br/><tab/>    using propagate_on_container_move_assignment = std::true_type;
+<br/><tab/>    using propagate_on_container_swap            = std::true_type;
+<br/>};
+<br/>
+<br/>using MyString = std::string&lt;char, std::char_traits&lt;char&gt;, PropAlloc&lt;char&gt;&gt;;
+<br/>using MyVector = std::vector&lt;MyString, PropAlloc&lt;MyString&gt;&gt;;
+<br/>
+<br/>PropAlloc allocA(1);
+<br/>PropAlloc allocB(2);
+<br/>
+<br/>MyVector v(allocA);
+<br/>v.push_back("hello");
+<br/>v[0] = MyString("goodbye", allocB);
+<br/>assert(allocA == v.get_allocator());
+<br/>assert(allocB == v[0].get_allocator());
+</tt>
+<br/>
+<br/>Note that, by design, the vector and its elements do not share an allocator.  
+There is nothing wrong with that, but it is not the scoped allocator model.  Now, let's do the same with optional:
+<br/>
+<tt>
+<br/>using MyOptional = std::basic_optional&lt;MyString, PropAlloc&lt;char&gt;&gt;;
+<br/>MyOptional opt(std::allocator_arg_t, allocA, MyString("hello"));
+<br/>opt = MyString("goodbye", allocB);
+<br/>assert(allocA == opt.get_allocator());
+<br/>assert(allocB == opt.value().get_allocator());
+</tt>
+<br/>
+<br/>
+The behavior mimics the vector case, so what's the problem?  
+The problem is "what's the purpose of storing an allocator in optional in the first place?"  
+For vector, the allocator is used by the vector itself to allocate memory.  
+For optional, however, the optional object does not allocate memory, so has no use for an allocator.  
+It stores it for use by the value object, but if the value object's allocator 
+isn't consistent with the optional, then it seems to have no real purpose.  
+Instead, the allocator for the value can be passed directly into the emplace functions,
+using the existing mechanisms. However, one can conceive a scoped allocator 
+that is not polymorphic and might even use fancy pointer types. 
+Having `basic_optional` does give flexibility to support that.
+</p>
+
+<p> Such approach adds some complexity to the design and reasoning about what happens. 
+Consider:
+<br/>
+<tt>
+<br/>basic_optional&lt;T, AllocA &gt; alice;
+<br/>basic_optional&lt;U, AllocB &gt; bob = alice; // #1
+<br/>alice = bob // #2</tt>
+<br/> 
+<br/>The questions that need to be answered are
+<br/>1)  what requirements are needed from AllocA and AllocB for #1 and #2 to be valid ?
+<br/>2)  what is the resulting allocator ?     
+<br/>
+<br/> One possible approach is to disallow #1 and #2 unless AllocA and AllocB are 
+different specialisations of the same allocator. The user can still achieve construction/assignment 
+by retrieving the underlying value type object :
+<br/>
+ <tt>
+<br/>basic_optional&lt;T, AllocA &gt; alice;
+<br/>basic_optional&lt;U, AllocB &gt; bob = alice.value(); 
+<br/>alice = bob.value() </tt>
+<br/>
+<br/>It's worth noting that this approach increases 
+the number of constructors and assignment operators.
+
+<br/> 
+<br/> With the approach described above, the resulting allocator is determined by the 
+<tt>allocator_traits&lt;AllocB&gt;</tt> which are the same as <tt>allocator_traits&lt;AllocA&gt;</tt>.
+To ensure this is the case, and to keep the value_type allocator in sync with the basic_optiona allocator, 
+every operation which would modify the allocator according to 
+the <tt>allocator_traits&lt;AllocB&gt;</tt> needs to be implemented in terms of uses-allocator construction.
+<br/>
+<br/> Now consider :
+<br/>
+<tt><br/>alice = basic_optional&lt;T, AllocA &gt;{} </tt>
+<br/>
+<br/> When <tt>allocator_traits&lt;AllocA &gt;::propagate_on_container_move_assignment::value == true</tt>,
+<tt>allocator_traits&lt;AllocA &gt;::propagate_on_container_copy_assignment::value == false</tt>, 
+and <tt>T</tt> does not support move semantics, we get into a situation where an assignment through optional
+object propagates the allocator, while the same assignment to a naked value_type objects doesn't. If the user
+designed the type (i.e. deliberately disabled move semantics) with the intention that the allocator never 
+changes after the object has been constructed, this could cause a problem. We are not aware of such users, but
+the case is presented for the purposes of documenting that it has been considered.
+</p>
+<p> The issues discussed above are avoided in the current design because allocator traits of <tt>std::pmr::polymorphic_allocator&lt;&gt;</tt>
+do not allow for allocator to change after the object has been created. Similarly, because only one allocator family is supported, there is no need
+to consider cases where the rhs allocator is of an unrelated type. However, the application of the current design is limited to a 
+subset of users of allocator aware standard containers. 
+Users who need allocators with propagation traits that are different to that of <tt>std::pmr::polymorphic_allocator&lt;&gt;</tt>
+would still need to write their own alllocator aware optional. If we can express the semantics of the current design 
+in terms of the propagation traits of std::polymorphic_allocator, then we can easily extend the design to cover 
+other propagation traits. The remaining work is deciding what to do with allocators that are unrelated and
+perhaps even non-convertible. For such questions, there's an approach that's forward-compatible and allows 
+relaxations/extensions in the future.
+</p>
+
+If we decide to pursue basic_optional, we need to decide whether we want to support non-scoped propagating allocators. 
+That is, should the construction of the value_type element be done using uses-allocator construction or directly 
+through <tt>allocator_traits&lt;alloc&gt;::construct()</tt>. 
+
+	<h3>Should <tt>std::pmr::optional</tt> be placed in the <tt>&lt;optional&gt;</tt> header?
 </h3>
 	<br/> This proposal puts <tt>std::pmr::optional</tt> in a <tt>optional</tt> header. Historically, pmr containers didn't have their own header files.
 	However, <tt>std::pmr::optional</tt> is a more complex type than, for example, <tt>std::pmr::vector</tt>.
@@ -246,22 +400,18 @@ wouldn't be.
   polymorphic_allocator<>.)
 </p>
 
-<p><h3>Should <tt>std::pmr::optional</tt> be a more allocator generic type  </h3></p>
-<p>
-  In the reflector discussion, Ville Voutilainen and Tomasz Kamińskimasz made the following request : ": The C++ standard library should 
-  provide building blocks that allow multiple semantics to be expressed, as opposed to deciding on a narrow subset, 
-  and making an allocator-aware optional obey the static properties, namely the propagation traits, of an allocator is a fundamental piece of such genericity.
-  See P2080 https://wg21.link/P2080"
-</p>
+
+
+
 <h2>Proposed wording</h2>
 <p>
 Add new paragraphs after 20.6.1/p1 [optional.general]
 </p>
 <p> <blockquote>
 <ins>
-[2] <tt>spmr::optional</tt> is a class template such that for a type <tt>T</tt>, where
+[2] <tt>pmr::optional</tt> is a class template such that for a type <tt>T</tt>, where
 <tt>uses_allocator&lt;T, pmr::polymorphic_allocator&lt;&gt;&gt;</tt> is true, an optional object of type 
-<tt>spmr::optional&lt;T&gt;</tt> will construct the contained object, if any,
+<tt>pmr::optional&lt;T&gt;</tt> will construct the contained object, if any,
 	with an allocator of type <tt>pmr::polymorphic_allocator&lt;&gt;</tt>. 
 <br/>
 
@@ -639,8 +789,11 @@ namespace std::pmr {
 <br/><tab2/>     class optional;
 <br/>		  
 <br/><tab/>  // [pmroptional.traits], allocator-related traits
-<br/><tab/>    template&ltclass T&gt;
+<br/><tab/>    template&lt;class T&gt;
 <br/><tab2/>   struct uses_allocator&ltT, polymorphic_allocator&lt;&gt;&gt;;
+<br/>
+<br/><tab/>   template&lt;class T&gt;
+<br/><tab2/>  constexpr bool uses-poly-alloc = uses_allocator&lt;T, pmr::polymorphic_allocator&lt;&gt;&gt;::value;   // exposition only
 <br/>
  <br/><tab/>  // [pmroptional.relops], relational operators
 <br/><tab/>   template&lt;class T, class U&gt;
@@ -835,7 +988,7 @@ namespace std::pmr {
 <br/>
 <br/><tab/>  private:
 <br/><tab2/>    T* val;         // exposition only
-<br/><tab2/>    const polymorphic_allocator&lt;&gt;  <i>M_alloc</i>;         // <i> exposition only; not always provided, see below</i>
+<br/><tab2/>    const polymorphic_allocator&lt;&gt;  <i>alloc</i>;         // <i> exposition only; not always provided, see below</i>
 <br/><tab/>  };
 <br/>
 <br/><tab/>   template&lt;class T&gt;
@@ -854,21 +1007,21 @@ namespace std::pmr {
 When an instance of <i>optional</i>&lt;T&gt; contains a value, it means that an object of type <tt>T</tt> 
 is allocated within the storage of the <i>optional</i> object. Implementations are not permitted to use 
 additional storage, such as dynamic memory, to allocate its contained value. The contained value shall be allocated in a 
-region of the <i>optional</i>&lt;T&gt; storage suitably aligned for the type <tt>T</tt> and, if <tt>uses_allocator&lt;T, polymorphic_allocator&lt;&gt;&gt;</tt> is true,
+region of the <i>optional</i>&lt;T&gt; storage suitably aligned for the type <tt>T</tt> and, if <tt>uses-poly-alloc</tt> is true,
 constructed by uses-allocator construction 
-with allocator <tt><i>M_alloc</i></tt>. When an object of type <i>optional</i>&lt;T&gt; is contextually 
+with allocator <tt><i>alloc</i></tt>. When an object of type <i>optional</i>&lt;T&gt; is contextually 
 converted to bool, the conversion returns true if the object contains a value; otherwise the conversion returns false.
 </ins></blockquote>
 <blockquote><ins>Member <tt>val</tt> is provided for exposition only. When an <i>optional</i>&lt;T&gt;
 object contains a value, val points to the contained value.
 </ins></blockquote>
-<blockquote><ins>If and only if <tt>uses_allocator&lt;T, polymorphic_allocator&lt;&gt;&gt;</tt> is <tt>false</tt>, optional&lt;T&gt; publicly inherits from 
+<blockquote><ins>If and only if <tt>uses-poly-alloc</tt> is <tt>false</tt>, optional&lt;T&gt; publicly inherits from 
 std::optional&lt;T&gt;
 </ins></blockquote>
-<blockquote><ins>If and only if <tt>uses_allocator&lt;T, polymorphic_allocator&lt;&gt;&gt;</tt> is <tt>true</tt>, the following applies :
+<blockquote><ins>If and only if <tt>uses-poly-alloc</tt> is <tt>true</tt>, the following applies :
 <br/> - <tt>allocator_type</tt> will be defined,
-<br/> - exposition only member <tt><i>M_alloc</i></tt> will be provided and will be used to create the contained value, if any, and
-<br/> - if &lt;T&gt; provides <tt>get_allocator()</tt> member function whose return type is convertible to <tt>polymorphic_allocator&lt;&gt;</tt>, the implementation is 
+<br/> - exposition only member <tt><i>alloc</i></tt> will be provided and will be used to create the contained value, if any, and
+<br/> - if <tt>T</tt> provides a <tt>get_allocator()</tt> member function whose return type is convertible to <tt>polymorphic_allocator&lt;&gt;</tt>, the implementation is 
 allowed to assume that the allocator used for constructing the element is the same allocator as returned 
 by <tt>T::get_allocator()</tt>. [<i>Note:</i> In such an implementation, <tt>pmr::optional&lt;pmr::string&gt;</tt> 
 will be zero-overhead compared to <tt>optional&lt;pmr::string&gt;</tt>. -- <i>end note</i>]
@@ -882,41 +1035,41 @@ that meets the <i>Cpp17Destructible</i> requirements (Table 30).</ins></blockquo
 <p><blockquote><ins>
 <br/><code>optional() noexcept;</code>
 <br/><code>optional(nullopt_t) noexcept;</code>
-<br/><tab/><i>Effects:</i> If <tt>uses_allocator&lt;T, polymorphic_allocator&lt;&gt;&gt;</tt> is <tt>true</tt>, <tt><i>M_alloc</i></tt> is default initialized</tt>
+<br/><tab/><i>Effects:</i> If <tt>uses-poly-alloc</tt> is <tt>true</tt>, <tt><i>alloc</i></tt> is default initialized</tt>
 <br/><tab/><i>Ensures:</i> *this does not contain a value.
 <br/><tab/><i>Remarks:</i> No contained value is initialized.
 <br/>
 <br/><code>optional(const optional&amp;);</code>
-<br/><tab/><i>Effects:</i> If <tt>uses_allocator&lt;T, polymorphic_allocator&lt;&gt;&gt;</tt> is <tt>true</tt>, <tt><i>M_alloc</i></tt> is default initialized</tt>. 
-If <tt>rhs</tt> contains a value, initializes the contained value 
-with the expression <tt>*rhs</tt>.
+<br/><tab/><i>Effects:</i> If <tt>uses-poly-alloc</tt> is <tt>true</tt>, <tt><i>alloc</i></tt> is default initialized</tt>. 
+If <tt>rhs</tt> contains a value, constructs the contained value with uses-allocator construction ([allocator.uses.construction]) with <i>alloc</i> and 
+the expression <tt>*rhs</tt>.
 <br/><tab/><i>Ensures:</i> <tt>bool(rhs) == bool(*this)</tt>.
 <br/><tab/><i>Throws:</i> Any exception thrown by the selected constructor of <tt>T</tt>.
-<br/><tab/><i>Mandates:</i><tt>is_­copy­constructible_­v&lt;T&gt;</tt> is true.
+<br/><tab/><i>Mandates:</i><tt>is_­copy­_constructible_­v&lt;T&gt;</tt> is true.
 
 <br/>
 <br/><code>optional(optional&amp;&amp; rhs) noexcept(<i>see below</i>)</code>
-<br/><tab/><i>Effects:</i> If <tt>uses_allocator&lt;T, polymorphic_allocator&lt;&gt;&gt;</tt> is <tt>true</tt>, <tt><i>M_alloc</i></tt> is initialized with <tt>rhs.<i>M_alloc</i></tt>. 
-If <tt>rhs</tt> contains a value, initializes the contained value
-with the expression <tt>std​::​move(*rhs)</tt>. <tt>bool(rhs)</tt> is unchanged.
+<br/><tab/><i>Effects:</i> If <tt>uses-poly-alloc</tt> is <tt>true</tt>, <tt><i>alloc</i></tt> is initialized with <tt>rhs.<i>alloc</i></tt>. 
+If <tt>rhs</tt> contains a value, constructs the contained value with uses-allocator construction ([allocator.uses.construction]) with <i>alloc</i> and 
+the expression <tt>std​::​move(*rhs)</tt>. <tt>bool(rhs)</tt> is unchanged.
 <br/><tab/><i>Ensures:</i> <tt>bool(rhs) == bool(*this)</tt>.
 <br/><tab/><i>Throws:</i> Any exception thrown by the selected constructor of <tt>T</tt>.
 <br/><tab/><i>Remarks:</i> The expression inside <tt>noexcept</tt> is equivalent to <tt>is_­nothrow_­move_­constructible_­v&lt;T&gt;</tt>.
 <br/><tab/><i>Mandates:</i><tt>is_­move_­constructible_­v&lt;T&gt;</tt> is true.
 <br/>
 <br/><code>optional(const std::optional&amp;);</code>
-<br/><tab/><i>Effects:</i> If <tt>uses_allocator&lt;T, polymorphic_allocator&lt;&gt;&gt;</tt> is <tt>true</tt>, <tt><i>M_alloc</i></tt> is default initialized</tt>. 
+<br/><tab/><i>Effects:</i> If <tt>uses-poly-alloc</tt> is <tt>true</tt>, <tt><i>alloc</i></tt> is default initialized</tt>. 
 If <tt>rhs</tt> contains a value, initializes the contained value 
 with the expression <tt>*rhs</tt>.
 <br/><tab/><i>Ensures:</i> <tt>bool(rhs) == bool(*this)</tt>.
 <br/><tab/><i>Throws:</i> Any exception thrown by the selected constructor of <tt>T</tt>.
-<br/><tab/><i>Mandates:</i><tt>is_­copy­constructible_­v&lt;T&gt;</tt> is true.
+<br/><tab/><i>Mandates:</i><tt>is_­copy­_constructible_­v&lt;T&gt;</tt> is true.
 
 <br/>
 <br/><code>optional(std::optional&amp;&amp; rhs)</code>
-<br/><tab/><i>Effects:</i> If <tt>uses_allocator&lt;T, polymorphic_allocator&lt;&gt;&gt;</tt> is <tt>true</tt>, <tt><i>M_alloc</i></tt> is initialized with <tt>rhs.<i>M_alloc</i></tt>. 
-If <tt>rhs</tt> contains a value, initializes the contained value
-with the expression <tt>std​::​move(*rhs)</tt>. <tt>bool(rhs)</tt> is unchanged.
+<br/><tab/><i>Effects:</i> If <tt>uses-poly-alloc</tt> is <tt>true</tt>, <tt><i>alloc</i></tt> is initialized with <tt>rhs.<i>alloc</i></tt>. 
+If <tt>rhs</tt> contains a value, constructs the contained value with uses-allocator construction ([allocator.uses.construction]) 
+with <i>alloc</i> and the expression <tt>std​::​move(*rhs)</tt>. <tt>bool(rhs)</tt> is unchanged.
 <br/><tab/><i>Ensures:</i> <tt>bool(rhs) == bool(*this)</tt>.
 <br/><tab/><i>Throws:</i> Any exception thrown by the selected constructor of <tt>T</tt>.
 <br/><tab/><i>Mandates:</i><tt>is_­move_­constructible_­v&lt;T&gt;</tt> is true.
@@ -924,23 +1077,23 @@ with the expression <tt>std​::​move(*rhs)</tt>. <tt>bool(rhs)</tt> is unchan
 
 <br/>
 <br/><code>template&lt;class... Args&gt; explicit optional(in_place_t, Args&amp;&amp;... args);</code>
-<br/><tab/><i>Effects:</i> If <tt>uses_allocator&lt;T, polymorphic_allocator&lt;&gt;&gt;</tt> is <tt>true</tt>, <tt><i>M_alloc</i></tt> is default initialized</tt>.  
-Initializes the contained value with <tt>std​::​forward&lt;Args&gt;(args)....</tt>. 
+<br/><tab/><i>Effects:</i> If <tt>uses-poly-alloc</tt> is <tt>true</tt>, <tt><i>alloc</i></tt> is default initialized</tt>.  
+Constructs the contained value with uses-allocator construction ([allocator.uses.construction]) with <i>alloc</i> and <tt>std​::​forward&lt;Args&gt;(args)....</tt>. 
 <br/><tab/><i>Ensures:</i> <tt>*this</tt> contains a value..
 <br/><tab/><i>Throws:</i> Any exception thrown by the selected constructor of <tt>T</tt>.
 <br/><tab/><i>Mandates:</i><tt>is_­copy_­constructible_­v&lt;T&gt;</tt> is true.
 
 <br/>
 <br/><code>template&lt;class... Args&gt; explicit optional(in_place_t, initializer_list&lt;U&gt; il, Args&amp;&amp;... args);</code>
-<br/><tab/><i>Effects:</i>  If <tt>uses_allocator&lt;T, polymorphic_allocator&lt;&gt;&gt;</tt> is <tt>true</tt>, <tt><i>M_alloc</i></tt> is default initialized</tt>. 
-Initializes the contained value with <tt>il and std​::​forward&lt;Args&gt;(args)....</tt>.
+<br/><tab/><i>Effects:</i>  If <tt>uses-poly-alloc</tt> is <tt>true</tt>, <tt><i>alloc</i></tt> is default initialized</tt>. 
+Constructs the contained value with uses-allocator construction ([allocator.uses.construction]) with <i>alloc</i>, <tt>il, and std​::​forward&lt;Args&gt;(args)....</tt>.
 <br/><tab/><i>Ensures:</i> <tt>*this</tt> contains a value..
 <br/><tab/><i>Throws:</i> Any exception thrown by the selected constructor of <tt>T</tt>.
 <br/><tab/><i>Mandates:</i><tt>is_­constructible_­v&lt;T, initializer_­list&lt;U&gt;&amp;, Args&amp;&amp;...&gt;</tt> is true.  
 <br/>
 <br/><code>template&lt;class U = T&gt; explicit(<i>see below</i>) optional(U&amp;&amp; rhs);</code>
-<br/><tab/><i>Effects:</i>If <tt>uses_allocator&lt;T, polymorphic_allocator&lt;&gt;&gt;</tt> is <tt>true</tt>, <tt><i>M_alloc</i></tt> is default initialized</tt>.
-Initializes the contained value with <tt> std​::​forward&lt;U&gt;(rhs)</tt>. 
+<br/><tab/><i>Effects:</i>If <tt>uses-poly-alloc</tt> is <tt>true</tt>, <tt><i>alloc</i></tt> is default initialized</tt>.
+Constructs the contained value with uses-allocator construction ([allocator.uses.construction]) with <i>alloc</i> and <tt> std​::​forward&lt;U&gt;(rhs)</tt>. 
 <br/><tab/><i>Ensures:</i> <tt>*this</tt> contains a value.
 <br/><tab/><i>Throws:</i> Any exception thrown by the selected constructor of <tt>T</tt>.
 <br/><tab/><i>Remarks:</i>The expression inside <tt>explicit</tt> is equivalent to:
@@ -953,8 +1106,9 @@ is <tt>false</tt>, and
 
 <br/>
 <br/><code>template&lt;class U&gt; explicit(<i>see below</i>) optional(const optional&lt;U&gt;&amp; rhs);</code>
-<br/><tab/><i>Effects:</i>If <tt>uses_allocator&lt;T, polymorphic_allocator&lt;&gt;&gt;</tt> is <tt>true</tt>, <tt><i>M_alloc</i></tt> is default initialized</tt>. 
-If <tt>rhs</tt> contains a value, initializes the contained value with <tt>*rhs</tt>. 
+<br/><tab/><i>Effects:</i>If <tt>uses-poly-alloc</tt> is <tt>true</tt>, <tt><i>alloc</i></tt> is default initialized</tt>. 
+If <tt>rhs</tt> contains a value, constructs the contained value with uses-allocator construction ([allocator.uses.construction]) 
+with <i>alloc</i> and <tt>*rhs</tt>. 
 <br/><tab/><i>Ensures:</i> <tt>bool(rhs) == bool(*this)</tt>.
 <br/><tab/><i>Throws:</i> Any exception thrown by the selected constructor of <tt>T</tt>.
 <br/><tab/><i>Remarks:</i>The expression inside <tt>explicit</tt> is equivalent to:
@@ -982,8 +1136,9 @@ If <tt>rhs</tt> contains a value, initializes the contained value with <tt>*rhs<
 
 <br/>
 <br/><code>template&lt;class U&gt; explicit(<i>see below</i>) optional(optional&lt;U&gt;&amp;&amp; rhs);</code>
-<br/><tab/><i>Effects:</i>If <tt>uses_allocator&lt;T, polymorphic_allocator&lt;&gt;&gt;</tt> is <tt>true</tt>, <tt><i>M_alloc</i></tt> is default initialized</tt>.
-If <tt>rhs</tt> contains a value, initializes the contained valuewith <tt>std​::​move(*rhs)</tt>. <tt>bool(rhs)</tt> is unchanged.
+<br/><tab/><i>Effects:</i>If <tt>uses-poly-alloc</tt> is <tt>true</tt>, <tt><i>alloc</i></tt> is default initialized</tt>.
+If <tt>rhs</tt> contains a value, constructs the contained value with uses-allocator construction ([allocator.uses.construction]) 
+with <i>alloc</i> and <tt>std​::​move(*rhs)</tt>. <tt>bool(rhs)</tt> is unchanged.
 <br/><tab/><i>Ensures:</i> <tt>bool(rhs) == bool(*this)</tt>.
 <br/><tab/><i>Throws:</i> Any exception thrown by the selected constructor of <tt>T</tt>.
 <br/><tab/><i>Remarks:</i>The expression inside <tt>explicit</tt> is equivalent to:
@@ -1010,8 +1165,9 @@ If <tt>rhs</tt> contains a value, initializes the contained valuewith <tt>std​
 
 <br/>
 <br/><code>template&lt;class U&gt; explicit(<i>see below</i>) optional(const std::optional&lt;U&gt;&amp; rhs);</code>
-<br/><tab/><i>Effects:</i>If <tt>uses_allocator&lt;T, polymorphic_allocator&lt;&gt;&gt;</tt> is <tt>true</tt>, <tt><i>M_alloc</i></tt> is default initialized</tt>.
-If <tt>rhs</tt> contains a value, initializes the contained value with <tt>*rhs</tt>. 
+<br/><tab/><i>Effects:</i>If <tt>uses-poly-alloc</tt> is <tt>true</tt>, <tt><i>alloc</i></tt> is default initialized</tt>.
+If <tt>rhs</tt> contains a value, constructs the contained value with uses-allocator construction ([allocator.uses.construction]) 
+with <i>alloc</i> and <tt>*rhs</tt>. 
 <br/><tab/><i>Ensures:</i> <tt>bool(rhs) == bool(*this)</tt>.
 <br/><tab/><i>Throws:</i> Any exception thrown by the selected constructor of <tt>T</tt>.
 <br/><tab/><i>Remarks:</i>The expression inside <tt>explicit</tt> is equivalent to:
@@ -1039,9 +1195,10 @@ If <tt>rhs</tt> contains a value, initializes the contained value with <tt>*rhs<
 
 <br/>
 <br/><code>template&lt;class U&gt; explicit(<i>see below</i>) optional(std::optional&lt;U&gt;&amp;&amp; rhs);</code>
-<br/><tab/><i>Effects:</i>If <tt>uses_allocator&lt;T, polymorphic_allocator&lt;&gt;&gt;</tt>
- is <tt>true</tt>, <tt><i>M_alloc</i></tt> is default initialized</tt>. 
-If <tt>rhs</tt> contains a value, initializes the contained value with <tt>std​::​move(*rhs)</tt>. 
+<br/><tab/><i>Effects:</i>If <tt>uses-poly-alloc</tt>
+ is <tt>true</tt>, <tt><i>alloc</i></tt> is default initialized</tt>. 
+If <tt>rhs</tt> contains a value, constructs the contained value with uses-allocator construction ([allocator.uses.construction]) 
+with <i>alloc</i> and <tt>std​::​move(*rhs)</tt>. 
 <tt>bool(rhs)</tt> is unchanged.
 <br/><tab/><i>Ensures:</i> <tt>bool(rhs) == bool(*this)</tt>.
 <br/><tab/><i>Throws:</i> Any exception thrown by the selected constructor of <tt>T</tt>.
@@ -1093,7 +1250,7 @@ If <tt>rhs</tt> contains a value, initializes the contained value with <tt>std�
       <br/><tab/>explicit(<i>see below</i>) optional(allocator_arg_t, const polymorphic_allocator&lt;&gt;&amp;,std::optional&lt;U&gt;&amp;&amp;);  
  </code>
 <br/><tab/><i>Constraints:</i> <tt>uses_allocator&lt;T,polymorphic_allocator&lt;&gt;&gt;</tt> is true;
-<br/><tab/><i>Effects:</i> Equivalent to the preceding constructors except that <tt><i>M_alloc</i></tt> is initialized with <tt>a</tt>.
+<br/><tab/><i>Effects:</i> Equivalent to the preceding constructors except that <tt><i>alloc</i></tt> is initialized with <tt>a</tt>.
       </blockquote></ins></p>
 
 <p><h4><ins> Destructor [pmroptional.dtor]</ins></h4></p>
@@ -1127,9 +1284,9 @@ no effect.
 <td><ins><tt>rhs</tt> contains a value</ins></td>
 <td><ins>assigns <tt>*rhs</tt> to the contained value</ins></td>
 <td><ins>initializes the contained value with <tt>*rhs</tt>. 
-If <tt>uses_allocator&lt;T, polymorphic_allocator&lt;&gt;&gt;</tt>
+If <tt>uses-poly-alloc</tt>
  is <tt>true</tt>, initialization is done by uses-allocator construction 
-with allocator <tt><i>M_alloc</i></tt> </ins></td>
+with allocator <tt><i>alloc</i></tt> </ins></td>
 </tr>
 <tr>
 <td><ins><tt>rhs</tt> does not contain a value</ins></td>
@@ -1161,9 +1318,9 @@ This operator shall be defined as deleted unless <tt>is_­copy_­constructible_�
 <td><ins><tt>rhs</tt> contains a value</ins></td>
 <td><ins>assigns <tt>std​::​move(*rhs)</tt> to the contained value</ins></td>
 <td><ins>initializes the contained value with <tt>std​::​move(*rhs)</tt>. 
-If <tt>uses_allocator&lt;T, polymorphic_allocator&lt;&gt;&gt;</tt>
+If <tt>uses-poly-alloc</tt>
  is <tt>true</tt>, initialization is done by uses-allocator construction 
-with allocator <tt><i>M_alloc</i></tt> </ins></td>
+with allocator <tt><i>alloc</i></tt> </ins></td>
 </tr>
 <tr>
 <td><ins><tt>rhs</tt> does not contain a value</ins></td>
@@ -1186,9 +1343,9 @@ the state of <tt>*val</tt> and <tt>*rhs.val</tt> is determined by the exception 
 <br/>
 <br/><code>template&lt;class U = T&gt; optional&amp; operator=(U&amp;&amp; v);</code>
 <br/><tab/><i>Effects:</i> If <tt>*this</tt> contains a value, assigns <tt>std​::​forward&lt;U&gt;(v)</tt> to the contained value;
-otherwise initializes the contained value with <tt>std​::​forward&lt;U&gt;(v)</tt>. If <tt>uses_allocator&lt;T, polymorphic_allocator&lt;&gt;&gt;</tt>
+otherwise initializes the contained value with <tt>std​::​forward&lt;U&gt;(v)</tt>. If <tt>uses-poly-alloc</tt>
  is <tt>true</tt>, initialization is done by uses-allocator construction
-with allocator <tt><i>M_alloc</i></tt>
+with allocator <tt><i>alloc</i></tt>
 <br/><tab/><i>Returns:</i> <tt>*this</tt>.
 <br/><tab/><i>Ensures:</i> <tt>*this</tt> contains a value.
 <br/><tab/><i>Remarks: If any exception is thrown, the result of the expression <tt>bool(*this)</tt> remains unchanged.
@@ -1216,9 +1373,9 @@ the state of <tt>*val</tt> and <tt>v</tt> is determined by the exception safety 
 <td><ins><tt>rhs</tt> contains a value</ins></td>
 <td><ins>assigns <tt>*rhs</tt> to the contained value</ins></td>
 <td><ins>initializes the contained value with <tt>*rhs</tt>.
-If <tt>uses_allocator&lt;T, polymorphic_allocator&lt;&gt;&gt;</tt>
+If <tt>uses-poly-alloc</tt>
  is <tt>true</tt>, initialization is done by uses-allocator construction 
-with allocator <tt><i>M_alloc</i></tt> </ins></td>
+with allocator <tt><i>alloc</i></tt> </ins></td>
 </tr>
 <tr>
 <td><ins><tt>rhs</tt> does not contain a value</ins></td>
@@ -1276,9 +1433,9 @@ to <tt>T</tt>'s assignment, the state of <tt>*val</tt>  is determined by the exc
 <td><ins><tt>rhs</tt> contains a value</ins></td>
 <td><ins>assigns <tt> std​::​move(*rhs)</tt> to the contained value</ins></td>
 <td><ins>initializes the contained value with <tt> std​::​move(*rhs)</tt>.
-If <tt>uses_allocator&lt;T, polymorphic_allocator&lt;&gt;&gt;</tt>
+If <tt>uses-poly-alloc</tt>
  is <tt>true</tt>, initialization is done by uses-allocator construction 
-with allocator <tt><i>M_alloc</i></tt>.</ins></td>
+with allocator <tt><i>alloc</i></tt>.</ins></td>
 </tr>
 <tr>
 <td><ins><tt>rhs</tt> does not contain a value</ins></td>
@@ -1335,9 +1492,9 @@ to <tt>T</tt>'s assignment, the state of <tt>*val</tt>  is determined by the exc
 <td><ins><tt>rhs</tt> contains a value</ins></td>
 <td><ins>assigns <tt>*rhs</tt> to the contained value</ins></td>
 <td><ins>initializes the contained value with <tt>*rhs</tt>.
-If <tt>uses_allocator&lt;T, polymorphic_allocator&lt;&gt;&gt;</tt>
+If <tt>uses-poly-alloc</tt>
  is <tt>true</tt>, initialization is done by uses-allocator construction 
-with allocator <tt><i>M_alloc</i></tt> .</ins></td>
+with allocator <tt><i>alloc</i></tt> .</ins></td>
 </tr>
 <tr>
 <td><ins><tt>rhs</tt> does not contain a value</ins></td>
@@ -1396,9 +1553,9 @@ the state of <tt>*val</tt> and <tt>*rhs.val</tt> is determined by the exception 
 <td><ins><tt>rhs</tt> contains a value</ins></td>
 <td><ins>assigns <tt>*rhs</tt> to the contained value</ins></td>
 <td><ins>initializes the contained value with <tt>*rhs</tt>.
-If <tt>uses_allocator&lt;T, polymorphic_allocator&lt;&gt;&gt;</tt>
+If <tt>uses-poly-alloc</tt>
  is <tt>true</tt>, initialization is done by uses-allocator construction 
-with allocator <tt><i>M_alloc</i></tt> </ins></td>
+with allocator <tt><i>alloc</i></tt> </ins></td>
 </tr>
 <tr>
 <td><ins><tt>rhs</tt> does not contain a value</ins></td>
@@ -1446,9 +1603,9 @@ the state of <tt>*val</tt> and <tt>*rhs.val</tt> is determined by the exception 
 <br/><code>  template&lt;class... Args&gt;> T&amp; emplace(Args&amp;&amp;...);</code>
 <br/><tab/><i>Constraints:</i> <tt>is_­constructible_­v&lt;T, Args&amp;&amp;...&gt; </tt>is true.
 <br/><tab/><i>Effects:</i> Calls <tt>*this = nullopt</tt>. Then initializes the contained value 
-with <tt>std​::​forward&lt;Args&gt;(args)....</tt>. If <tt>uses_allocator&lt;T, polymorphic_allocator&lt;&gt;&gt;</tt>
+with <tt>std​::​forward&lt;Args&gt;(args)....</tt>. If <tt>uses-poly-alloc</tt>
  is <tt>true</tt>, initialization is done by uses-allocator construction 
-with allocator <tt><i>M_alloc</i></tt>.
+with allocator <tt><i>alloc</i></tt>.
 <br/><tab/><i>Ensures:</i> <tt>*this</tt> contains a value.
 <br/><tab/><i>Returns:</i> A reference to the new contained value.
 <br/><tab/><i>Throws:</i> Any exception thrown by the selected constructor of <tt>T</tt>.
@@ -1460,9 +1617,9 @@ with allocator <tt><i>M_alloc</i></tt>.
 <br/><code>    template&lt;class U, class... Args&gt; T&amp; emplace(initializer_list&lt;U&gt;, Args&amp;&amp;...);</code>
 <br/><tab/><i>Constraints:</i> <tt>is_­constructible_­v&lt;T, initializer_­list&lt;U&gt;&amp;, Args&amp;&amp;...&gt; </tt>is true.
 <br/><tab/><i>Effects:</i> Calls <tt>*this = nullopt</tt>. Then initializes the contained value 
-with <tt>il</tt> and <tt> std​::​forward&lt;Args&gt;(args)....</tt>. If <tt>uses_allocator&lt;T, polymorphic_allocator&lt;&gt;&gt;</tt>
+with <tt>il</tt> and <tt> std​::​forward&lt;Args&gt;(args)....</tt>. If <tt>uses-poly-alloc</tt>
  is <tt>true</tt>, initialization is done by uses-allocator construction 
-with allocator <tt><i>M_alloc</i></tt>.
+with allocator <tt><i>alloc</i></tt>.
 <br/><tab/><i>Ensures:</i> <tt>*this</tt> contains a value.
 <br/><tab/><i>Returns:</i> A reference to the new contained value.
 <br/><tab/><i>Throws:</i> Any exception thrown by the selected constructor of <tt>T</tt>.
@@ -1476,7 +1633,7 @@ with allocator <tt><i>M_alloc</i></tt>.
 
 <br/><tt>void swap(optional&amp; rhs) noexcept(<i>see below</i>);</tt>
 <br/><tab/><i>Constraints:</i> Lvalues of type <tt>T</tt> shall be swappable and <tt>is_­move_­constructible_­v&lt;T&gt;</tt> is <tt>true</tt>.
-<br/><tab/><i>Expects:</i>If <tt>uses_allocator&lt;T, polymorphic_allocator&lt;&gt;&gt;</tt>
+<br/><tab/><i>Expects:</i>If <tt>uses-poly-alloc</tt>
  is <tt>true</tt>, <tt>a.get_allocator() == b.get_allocator()</tt>.
 <br/><tab/><i>Effects:</i> See Table x
 <br/><tab/><i>Throws:</i> Any exceptions thrown by the operations in the relevant part of Table x.
@@ -1499,18 +1656,18 @@ of <tt>T</tt>’s move constructor.
 <td><ins>calls <tt>swap(*(*this), *rhs)</tt></ins></td>
 <td><ins>initializes the contained value with
 <tt>std​::​move(*rhs)</tt> as the constructor argument, followed by <tt>rhs.val->T​::​~T()</tt>;
-If <tt>uses_allocator&lt;T, polymorphic_allocator&lt;&gt;&gt;</tt>
+If <tt>uses-poly-alloc</tt>
  is <tt>true</tt>, initialization is done by uses-allocator construction 
-with allocator <tt><i>M_alloc</i></tt>.
+with allocator <tt><i>alloc</i></tt>.
 Postcondition is that <tt>*this</tt> contains a value and <tt>rhs</tt> does not contain a value</ins></td>
 </tr>
 <tr>
 <td><ins><tt>rhs</tt> does not contain a value</ins></td>
 <td><ins>initializes the contained value with
 <tt>std​::​move(*(*this))</tt> as the constructor argument, followed by <tt>val->T​::​~T()</tt>; 
-If <tt>uses_allocator&lt;T, polymorphic_allocator&lt;&gt;&gt;</tt>
+If <tt>uses-poly-alloc</tt>
  is <tt>true</tt>, initialization is done by uses-allocator construction 
-with allocator <tt><i>M_alloc</i></tt>.
+with allocator <tt><i>alloc</i></tt>.
 Postcondition is that <tt>*this</tt> does not contain a value and <tt>rhs</tt> contains a value</ins></tt></ins></td>
 <td><ins>no effect</ins></td>
 </tr>
@@ -1605,7 +1762,7 @@ the program is ill-formed.
 <br/>
 <br/><tt>allocator_type get_allocator() const noexcept;</tt>
 <br/><tab/><i>Constraints:</i> <tt>uses_allocator&lt;T,polymorphic_allocator&lt;&gt;&gt;</tt> is true;
-<br/><tab/><i>Returns:</i> <tt><i>M_alloc</i></tt>.
+<br/><tab/><i>Returns:</i> <tt><i>alloc</i></tt>.
 <br/><tab/><i>Throws:</i> nothing.
 
 
@@ -1825,13 +1982,13 @@ otherwise <tt>*x &gt;= *y</tt>.
 <br/><tab/><tt>   template&lt;class T&gt; constexpr optional&lt;decay_­t&lt;T&gt;&gt; make_optional(T&amp;&amp;);</tt>
 <br/><tab/><i>Returns: </i> <tt>optional&lt;decay_­t&lt;T&gt;&gt;(std​::​forward&lt;T&gt;(v)).</tt>
 <br/><tab/><i>Remarks: </i> Specialization of this function template shall be a constexpr function if  
-<tt>uses_allocator&lt;T, polymorphic_allocator&lt;&gt;&gt;::value</tt> is <tt>false</tt>. 
+<tt>uses-poly-alloc::value</tt> is <tt>false</tt>. 
 
 <br/>
 <br/><tab/><tt>   template&lt;class T&gt; constexpr optional&lt;T&gt; make_optional();</tt>
 <br/><tab/><i>Effects: </i> Equivalent to: <tt> return optional&lt;T&gt(in_­place).</tt>
 <br/><tab/><i>Remarks: </i> Specialization of this function template shall be a constexpr function if  
-<tt>uses_allocator&lt;T, polymorphic_allocator&lt;&gt;&gt;::value</tt> is <tt>false</tt>.
+<tt>uses-poly-alloc::value</tt> is <tt>false</tt>.
 
 <br/>
 <br/><tab/><tt>   template&lt;class T, class Arg0, class... Args&gt constexpr 
@@ -1839,20 +1996,20 @@ otherwise <tt>*x &gt;= *y</tt>.
 <br/><tab/><i>Effects: </i> Equivalent to: <tt> return optional&lt;T&gt(in_­place, std​::​forward&lt;Arg0&gt;(arg0), std​::​forward&lt;Args&gt;(args)...).</tt>
 <br/><tab/><i>Constraints: </i><tt> !is_same&lt; typename remove_cvref_t&lt;ARG0&gt;, allocator_arg_t&gt;</tt>
 <br/><tab/><i>Remarks: </i> Specialization of this function template shall be a constexpr function if  
-<tt>uses_allocator&lt;T, polymorphic_allocator&lt;&gt;&gt;::value</tt> is <tt>false</tt>.
+<tt>uses-poly-alloc::value</tt> is <tt>false</tt>.
 
 <br/>
 <br/><tab/><tt>   template&lt;class T, class... Args&gt constexpr optional&lt;T&gt; make_optional(Args&amp;&amp;... args);</tt>
 <br/><tab/><i>Effects: </i> Equivalent to: <tt> return optional&lt;T&gt(in_­place, std​::​forward&lt;Args&gt;(args)...).</tt>
 <br/><tab/><i>Remarks: </i> Specialization of this function template shall be a constexpr function if  
-<tt>uses_allocator&lt;T, polymorphic_allocator&lt;&gt;&gt;::value</tt> is <tt>false</tt>.
+<tt>uses-poly-alloc::value</tt> is <tt>false</tt>.
 
 <br/>
 <br/><tab/><tt>   template&lt;class T, class U, class... Args> optional&lt;T&gt; </tt>
 <br/><tab2/><tt>  constexpr make_optional(initializer_list&lt;U&gt; il, Args&amp;&amp;... args);</tt>
 <br/><tab/><i>Effects: </i> Equivalent to: <tt> return optional&lt;T&gt(in_­place, il, std​::​forward&lt;Args&gt;(args)...).</tt>
 <br/><tab/><i>Remarks: </i> Specialization of this function template shall be a constexpr function if  
-<tt>uses_allocator&lt;T, polymorphic_allocator&lt;&gt;&gt;::value</tt> is <tt>false</tt>.
+<tt>uses-poly-alloc::value</tt> is <tt>false</tt>.
 
 <br/>
 <br/><tab/><tt>  template&lt;class T, optional&lt;decay_­t&lt;T&gt;&gt; </tt>
