@@ -977,8 +977,9 @@ that meets the <i>Cpp17Destructible</i> requirements (Table 30).</ins></blockquo
 <br/><tab/><i>Ensures:</i> *this does not contain a value.
 <br/><tab/><i>Remarks:</i> No contained value is initialized.
 <br/>
-<br/><code>basic_optional(const basic_optional&amp;);</code>
-<br/><tab/><i>Effects:</i> If <tt>uses-alloc</tt> is <tt>true</tt>, <tt><i>alloc</i></tt> is default initialized</tt>. 
+<br/><code>basic_optional(const basic_optional&amp; rhs);</code>
+<br/><tab/><i>Effects:</i> If <tt>uses-alloc</tt> is <tt>true</tt>, <tt><i>alloc</i></tt> is initialized from 
+<tt>allocator_traits&lt;Allocator&gt;::select_on_container_copy_construction(rhs.get_allocator())</tt>. 
 If <tt>rhs</tt> contains a value, constructs the contained value with uses-allocator construction ([allocator.uses.construction]) with <i>alloc</i> and 
 the expression <tt>*rhs</tt>.
 <br/><tab/><i>Ensures:</i> <tt>bool(rhs) == bool(*this)</tt>.
@@ -1220,16 +1221,27 @@ no effect.
 </tr>
 <tr>
 <td><ins><tt>rhs</tt> contains a value</ins></td>
-<td><ins>assigns <tt>*rhs</tt> to the contained value</ins></td>
-<td><ins>initializes the contained value with <tt>*rhs</tt>. 
+<td><ins>If <tt>allocator_traits&lt;Allocator&gt;::propagate_on_container_copy_assignment</tt> and 
+<tt>this->get_allocator() != rhs->get_allocator()</tt>is true :
+<br/><tab/> destroys the contained value by calling <tt>val->T::~T()</tt>,
+<br/><tab/> propagates the allocator, and
+<br/> <tab/>initializes the contained value with <tt>*rhs</tt> by uses-allocator construction with allocator alloc
+<br/> otherwise :
+<br/><tab/>assigns <tt>*rhs</tt> to the contained value</ins></td>
+<td><ins>If <tt>allocator_traits&lt;Allocator&gt;::propagate_on_container_copy_assignment</tt> and 
+<tt>this->get_allocator() != rhs->get_allocator()</tt>is true, propagates the allocator.
+<br/>Initializes the contained value with <tt>*rhs</tt>. 
 If <tt>uses-alloc</tt>
  is <tt>true</tt>, initialization is done by uses-allocator construction 
 with allocator <tt><i>alloc</i></tt> </ins></td>
 </tr>
 <tr>
 <td><ins><tt>rhs</tt> does not contain a value</ins></td>
-<td><ins>destroys the contained value by calling <tt>val->T::~T()</tt></ins></td>
-<td><ins>no effect</ins></td>
+<td><ins>If <tt>allocator_traits&lt;Allocator&gt;::propagate_on_container_copy_assignment</tt> and 
+<tt>this->get_allocator() != rhs->get_allocator()</tt>is true, propagates the allocator.
+<br/>Destroys the contained value by calling <tt>val->T::~T()</tt></ins></td>
+<td><ins>If <tt>allocator_traits&lt;Allocator&gt;::propagate_on_container_copy_assignment</tt> and 
+<tt>this->get_allocator() != rhs->get_allocator()</tt>is true, propagates the allocator.</ins></td>
 </tr>
 </table></blockquote>
 <br/><tab/><i>Returns:</i> <tt>*this</tt>.
@@ -1254,16 +1266,28 @@ This operator shall be defined as deleted unless <tt>is_­copy_­constructible_�
 </tr>
 <tr>
 <td><ins><tt>rhs</tt> contains a value</ins></td>
-<td><ins>assigns <tt>std​::​move(*rhs)</tt> to the contained value</ins></td>
-<td><ins>initializes the contained value with <tt>std​::​move(*rhs)</tt>. 
+<td><ins>If <tt>allocator_traits&lt;Allocator&gt;::propagate_on_container_move_assignment</tt> and 
+<tt>this->get_allocator() != rhs->get_allocator()</tt>is true :
+<br/><tab/> destroys the contained value by calling <tt>val->T::~T()</tt>,
+<br/><tab/> propagates the allocator, and
+<br/> <tab/>initializes the contained value with <tt>std​::​move(*rhs)</tt> by uses-allocator construction with allocator alloc
+<br/> otherwise :
+<br/><tab/>assigns <tt>std​::​move(*rhs)</tt> to the contained value</ins></td>
+<td><ins>If <tt>allocator_traits&lt;Allocator&gt;::propagate_on_container_move_assignment</tt> and 
+<tt>this->get_allocator() != rhs->get_allocator()</tt>is true, propagates the allocator.
+<br/>Initializes the contained value with <tt>std​::​move(*rhs)</tt>. 
 If <tt>uses-alloc</tt>
  is <tt>true</tt>, initialization is done by uses-allocator construction 
 with allocator <tt><i>alloc</i></tt> </ins></td>
 </tr>
 <tr>
 <td><ins><tt>rhs</tt> does not contain a value</ins></td>
-<td><ins>destroys the contained value by calling <tt>val->T::~T()</tt></ins></td>
-<td><ins>no effect</ins></td>
+<td><ins>If <tt>allocator_traits&lt;Allocator&gt;::propagate_on_container_move_assignment</tt> and 
+<tt>this->get_allocator() != rhs->get_allocator()</tt>is true, propagates the allocator.
+<br/>Destroys the contained value by calling <tt>val->T::~T()</tt></ins></td>
+<td><ins>If <tt>allocator_traits&lt;Allocator&gt;::propagate_on_container_move_assignment</tt> and 
+<tt>this->get_allocator() != rhs->get_allocator()</tt>is true, propagates the allocator.
+</ins></td>
 </tr>
 </table></blockquote>
 <br/><tab/><i>Returns:</i> <tt>*this</tt>.
@@ -1571,9 +1595,10 @@ with allocator <tt><i>alloc</i></tt>.
 
 <br/><tt>void swap(basic_optional&amp; rhs) noexcept(<i>see below</i>);</tt>
 <br/><tab/><i>Constraints:</i> Lvalues of type <tt>T</tt> shall be swappable and <tt>is_­move_­constructible_­v&lt;T&gt;</tt> is <tt>true</tt>.
-<br/><tab/><i>Expects:</i>If <tt>uses-alloc</tt>
- is <tt>true</tt>, <tt>a.get_allocator() == b.get_allocator()</tt>.
-<br/><tab/><i>Effects:</i> See Table x
+<br/><tab/><i>PreconditionsL</i> <tt>allocator_traits&lt;Allocator&gt;::propagate_on_container_swap::value</tt> is <tt>true</tt> or
+<tt>get_allocator() == s.get_allocator()</tt>.
+<br/><tab/><i>Effects:</i> If <tt>allocator_traits&lt;Allocator&gt;::propagate_on_container_swap</tt>, calls
+<tt>swap(alloc, rhs.alloc)</tt>.  See Table x
 <br/><tab/><i>Throws:</i> Any exceptions thrown by the operations in the relevant part of Table x.
 <br/><tab/><i>Remarks:</i> The expression inside <tt>noexcept</tt> is equivalent to:
 <tt>is_nothrow_move_constructible_v&lt;T&gt; &and;&and; is_nothrow_swappable_v&lt;T&gt;</tt>
