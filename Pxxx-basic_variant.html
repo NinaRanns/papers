@@ -1,0 +1,1409 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN"
+        "http://www.w3.org/TR/html4/loose.dtd">
+<html>
+<head>
+	<title>An allocator-aware variant type</title>
+
+	<style>
+	p {text-align:justify}
+	li {text-align:justify}
+	blockquote.note
+	{
+		background-color:#E0E0E0;
+		padding-left: 15px;
+		padding-right: 15px;
+		padding-top: 1px;
+		padding-bottom: 1px;
+	}
+	tab { padding-left: 2em; }
+    tab2 { padding-left: 4em; }
+	ins {background-color:#A0FFA0}
+	del {background-color:#FFA0A0}
+	</style>
+</head>
+<body>
+
+<address align=right>
+Document number: PXXX
+<br/>
+Audience: LEWG
+<br/>
+<br/>
+
+<a href="mailto:dinka.ranns@gmail.com">Nina Dinka Ranns</a><br/>
+<a href="mailto:phalpern@halpernwightsoftware.com">Pablo Halpern</a><br/>
+2022-07-06<br/>
+</address>
+<hr/>
+<h1 align=center>An allocator-aware varianttype</h1>
+
+<h2>Abstract</h2>
+ 
+<p>
+  Library types that can potentially hold <em>allocator-aware (AA)</em>
+  objects should, themselves, be allocator-aware. A PMR container, for example,
+  depends on AA types following a known AA protocol so that it (the container)
+  can uniformly manage its memory. Even types that don't manage their own
+  memory, such as <tt>tuple</tt>, follow the AA rules when they hold one more
+  more AA elements. (A special case is <tt>pair</tt>, which is not actually AA
+  but effectively follows the rules through special handling
+  in <em>uses-allocator construction</em>.)
+</p>
+<p>
+  The current definition of <tt>std::variant</tt> does not follow the rules
+  for an AA type, even when holding an AA value. This limitation
+  makes <tt>std::variant</tt> unsuitable for storage in an AA container when
+  memory allocation customization is needed.
+</p>
+<p>
+  In this paper, we propose a new, allocator-aware
+  <tt>basic_variant</tt> usable as a container element type and in any
+  other context where allocator propagation is expected. When all alternatives 
+  are non-AA types, <tt>basic_variant</tt> behaves as an <tt>std::variant</tt>, 
+  but is still a different type due to the C++ type deduction restrictions.
+  </p>
+<p>  
+  This is a complete proposal with formal wording.
+  It has not yet been discussed in LEWGI or LEWG.
+</p>
+
+<p>
+ 
+<h2>Motivation and Proposal Summary</h2>
+<p>
+  C++ has been moving towards a consistent PMR allocator model whereby
+  <em>allocator-aware (AA)</em> types adhere to a few rules:
+</p>
+<ol>
+  <li>Once constructed, an object's allocator only changes as specified by the 
+  allocator propagation traits.</li>
+  <li>The object's constructors all follow one of two argument protocols so
+    that they work with <em>uses-allocator construction</em> and thus can be
+    inserted as container elements using the container's allocator.</li>
+  <li>An object that can contain an AA element of user-specified type should
+    itself be AA and use its allocator to initialize its AA subobjects.</li>
+</ol>
+
+<p>
+  The current <tt>std::variant</tt> does not follow the above rules. When
+  changing alternative typse, it forgets its allocator, violating the first rule; its
+  constructors don't follow the AA protocols, so containers cannot pass their
+  allocators to <tt>variant</tt> elements; and it does not hold on an
+  allocator by which it can initialize it's contained object. As a
+  result, <tt>std::variant</tt> is not a good fit for situations where
+  allocators are used.
+  A <tt>std::pmr::vector&lt;variant&lt;std::pmr::string, int&gt;&gt;</tt>, for example,
+  cannot ensure that all of strings within it use the same allocator,
+  violating a key invariant of PMR containers. 
+</p>
+<p>
+  The <tt>std::basic_variant</tt> class template proposed here properly adheres to
+  the rules of an AA type when instantiated with an AA value type. It holds a
+  copy of the allocator used to construct it, even when it holds an non-AA alternative, 
+  and uses that allocator to construct AA alternatives. Containers
+  of <tt>std::basic_variant</tt> objects can correctly manage their memory.
+</p>
+
+ <p> The paper also proposed a <tt>std::pmr::variant</tt>, which is a 
+   specialisation of  <tt>std::basic_variant</tt> with 
+   <tt>std::pmr::polymorphic_allocator</tt>.
+ 
+ </p>
+
+<h2>Design decisions:</h2>
+
+<p>
+  The basic design of an AA variant is straight-forward: Add an allocator to
+  all of its constructors and use that allocator to construct the value object
+  each type the variant is engaged.  However, we posit that when all alternatives
+  are of non-AA type, there is no reason to pay the overhead of storing an 
+  allocator, nor to support the AA constructor interface. For this
+  reason, <tt>std::basic_variant</tt> has a different specialisation for AA and
+  non-AAtype. 
+ </p>
+<p>   
+  The free swap function has been made to have a wide contract and work with 
+  different allocators, as discussed in P0178 
+  (http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2016/p0178r0.html)
+</p>
+<p> For design simplicity reasons, the paper does not propose 
+<tt>std::basic_variant</tt> to be a completely separate type to<tt>std::variant</tt>.
+Conversions between the two types are not considered at this point in time. 
+</p>
+
+
+<h2>Proposed wording</h2>
+<p>
+Add new paragraphs after 20.6.1/p1 [variant.general]
+</p>
+
+
+</ins></blockquote>
+
+<p>
+Insert new sections after 20.6.3 Class template basic_variant [variant.variant]
+</p>
+<ins>
+<p><h3><ins> Header &lt;variant&gt; synopsis [pmrvariant.sys]</pmrvariant></ins></h3>
+
+<blockquote><ins><code>
+namespace std::pmr {	
+<br/><tab/>  // [pmrvariant.variant]
+<br/><tab/>   template&lt;class T&gt;
+<br/><tab2/>     class variant;
+<br/>		  
+<br/><tab/>  // [pmrvariant.traits], allocator-related traits
+<br/><tab/>    template&lt;class T&gt;
+<br/><tab2/>   struct uses_allocator&ltT, polymorphic_allocator&lt;&gt;&gt;;
+<br/>
+<br/><tab/>   template&lt;class T&gt;
+<br/><tab2/>  constexpr bool uses-poly-alloc = uses_allocator&lt;T, pmr::polymorphic_allocator&lt;&gt;&gt;::value;   // exposition only
+<br/>
+ <br/><tab/>  // [pmrvariant.relops], relational operators
+<br/><tab/>   template&lt;class T, class U&gt;
+<br/><tab2/>	bool operator==(const variant&lt;T&gt;&amp;, const variant&lt;U&gt;&amp;);
+<br/><tab/>   template&lt;class T, class U&gt;
+<br/><tab2/>	bool operator==(const variant&lt;T&gt;&amp;, const std::variant&lt;U&gt;&amp;);
+<br/><tab/>   template&lt;class T, class U&gt;
+<br/><tab2/>	bool operator==(const std::variant&lt;T&gt;&amp;, const variant&lt;U&gt;&amp;);
+<br/><tab/>   template&lt;class T, class U&gt;
+<br/><tab2/>	bool operator!=(const variant&lt;T&gt;&amp;, const variant&lt;U&gt;&amp;);
+<br/><tab/>   template&lt;class T, class U&gt;
+<br/><tab2/>	bool operator!=(const variant&lt;T&gt;&amp;, const std::variant&lt;U&gt;&amp;);
+<br/><tab/>   template&lt;class T, class U&gt;
+<br/><tab2/>	bool operator!=(const std::variant&lt;T&gt;&amp;, const variant&lt;U&gt;&amp;);
+<br/><tab/>   template&lt;class T, class U&gt;
+<br/><tab2/>	bool operator&lt;(const variant&lt;T&gt;&amp;, const variant&lt;U&gt;&amp;);
+<br/><tab/>   template&lt;class T, class U&gt;
+<br/><tab2/>	bool operator&lt;(const variant&lt;T&gt;&amp;, const std::variant&lt;U&gt;&amp;);
+<br/><tab/>   template&lt;class T, class U&gt;
+<br/><tab2/>	bool operator&lt;(const std::variant&lt;T&gt;&amp;, const variant&lt;U&gt;&amp;);
+<br/><tab/>   template&lt;class T, class U&gt;
+<br/><tab2/>	bool operator&gt;(const variant&lt;T&gt;&amp;, const variant&lt;U&gt;&amp;);
+<br/><tab/>   template&lt;class T, class U&gt;
+<br/><tab2/>	bool operator&gt;(const variant&lt;T&gt;&amp;, const std::variant&lt;U&gt;&amp;);
+<br/><tab/>   template&lt;class T, class U&gt;
+<br/><tab2/>	bool operator&gt;(const std::variant&lt;T&gt;&amp;, const variant&lt;U&gt;&amp;);
+<br/><tab/>   template&lt;class T, class U&gt;
+<br/><tab2/>	bool operator&lt;=(const variant&lt;T&gt;&amp;, const variant&lt;U&gt;&amp;);
+<br/><tab/>   template&lt;class T, class U&gt;
+<br/><tab2/>	bool operator&lt;=(const variant&lt;T&gt;&amp;, const std::variant&lt;U&gt;&amp;);
+<br/><tab/>   template&lt;class T, class U&gt;
+<br/><tab2/>	bool operator&lt;=(const std::variant&lt;T&gt;&amp;, const variant&lt;U&gt;&amp;);
+<br/><tab/>   template&lt;class T, class U&gt;
+<br/><tab2/>	bool operator&gt;=(const variant&lt;T&gt;&amp;, const variant&lt;U&gt;&amp;);
+<br/><tab/>   template&lt;class T, class U&gt;
+<br/><tab2/>	bool operator&gt;=(const variant&lt;T&gt;&amp;, const std::variant&lt;U&gt;&amp;);
+<br/><tab/>   template&lt;class T, class U&gt;
+<br/><tab2/>	bool operator&gt;=(const std::variant&lt;T&gt;&amp;, const variant&lt;U&gt;&amp;);
+<br/><tab/>   template&lt;class T, three_way_comparable_with&lt;T&gt; U&gt;
+<br/><tab2/>	compare_three_way_result_t&lt;T,U&gt;
+<br/><tab/><tab2/>      operator&lt;=&gt;(const variant&lt;T&gt;&amp;, const variant&lt;U&gt;&amp;);
+<br/><tab/>   template&lt;class T, three_way_comparable_with&lt;T&gt; U&gt;
+<br/><tab2/>	compare_three_way_result_t&lt;T,U&gt;
+<br/><tab/><tab2/>      operator&lt;=&gt;(const variant&lt;T&gt;&amp;, const std::variant&lt;U&gt;&amp;);
+<br/><tab/>   template&lt;class T, three_way_comparable_with&lt;T&gt; U&gt;
+<br/><tab2/>	compare_three_way_result_t&lt;T,U&gt;
+<br/><tab/><tab2/>      operator&lt;=&gt;(const std::variant&lt;T&gt;&amp;, const variant&lt;U&gt;&amp;);
+<br/>
+<br/><tab/>  // [pmrvariant.nullops], comparison with nullopt
+<br/><tab/>   template&lt;class T&gt; bool operator==(const variant&lt;T&gt;&amp;, nullopt_t) noexcept;
+<br/><tab/>   template&lt;class T&gt;
+<br/><tab2/>	strong_ordering operator&lt;=&gt;(const variant&lt;T&gt;&amp;, nullopt_t) noexcept;
+<br/>
+ <br/><tab/> // [pmrvariant.comp.with.t], comparison with T
+<br/><tab/>   template&lt;class T, class U&gt; bool operator==(const variant&lt;T&gt;&amp;, const U&amp;);
+<br/><tab/>   template&lt;class T, class U&gt; bool operator==(const T&amp;, const variant&lt;U&gt;&amp;);
+<br/><tab/>   template&lt;class T, class U&gt; bool operator!=(const variant&lt;T&gt;&amp;, const U&amp;);
+<br/><tab/>   template&lt;class T, class U&gt; bool operator!=(const T&amp;, const variant&lt;U&gt;&amp;);
+<br/><tab/>   template&lt;class T, class U&gt; bool operator&lt;(const variant&lt;T&gt;&amp;, const U&amp;);
+<br/><tab/>   template&lt;class T, class U&gt; bool operator&lt;(const T&amp;, const variant&lt;U&gt;&amp;);
+<br/><tab/>   template&lt;class T, class U&gt; bool operator&gt;(const variant&lt;T&gt;&amp;, const U&amp;);
+<br/><tab/>   template&lt;class T, class U&gt; bool operator&gt;(const T&amp;, const variant&lt;U&gt;&amp;);
+<br/><tab/>   template&lt;class T, class U&gt; bool operator&lt;=(const variant&lt;T&gt;&amp;, const U&amp;);
+<br/><tab/>   template&lt;class T, class U&gt; bool operator&lt;=(const T&amp;, const variant&lt;U&gt;&amp;);
+<br/><tab/>   template&lt;class T, class U&gt; bool operator&gt;=(const variant&lt;T&gt;&amp;, const U&amp;);
+<br/><tab/>   template&lt;class T, class U&gt; bool operator&gt;=(const T&amp;, const variant&lt;U&gt;&amp;);
+<br/><tab/>   template&lt;class T, three_way_comparable_with&lt;T&gt; U&gt;
+<br/><tab2/>	compare_three_way_result_t&lt;T,U&gt;
+<br/><tab/><tab2/>      operator&lt;=&gt;(const variant&lt;T&gt;&amp;, const U&amp;);
+<br/>
+ <br/><tab/> // [pmrvariant.specalg], specialized algorithms
+<br/><tab/>   template&lt;class T&gt;
+<br/><tab2/>    void swap(variant&lt;T&gt;&amp;, variant&lt;T&gt;&amp;) ;
+<br/>
+<br/><tab/>   template&lt;class T&gt;
+<br/><tab2/>	constexpr variant&lt;<i>see below</i>&gt; make_variant(T&amp;&amp;);
+<br/><tab/>   template&lt;class T&gt;
+<br/><tab2/>    constexpr variant&lt;T&gt; make_variant();
+<br/><tab/>   template&lt;class T, class Arg0, class... Args>
+<br/><tab2/>	constexpr variant&lt;T&gt; make_variant(Arg0 arg0&amp;&amp;, Args&amp;&amp;... args);
+<br/><tab/>   template&lt;class T, class U, class... Args>
+<br/><tab2/>	constexpr variant&lt;T&gt; make_variant(initializer_list&lt;U&gt; il, Args&amp;&amp;... args);
+<br/>
+<br/><tab/>   template&lt;class T&gt;
+<br/><tab2/>	constexpr variant&lt;<i>see below</i>&gt; make_variant(allocator_arg_t, const polymorphic_allocator&lt;&gt;&amp; a, T&amp;&amp;);
+<br/><tab/>   template&lt;class T, class... Args>
+<br/><tab2/>	constexpr variant&lt;T&gt; make_variant(allocator_arg_t, const polymorphic_allocator&lt;&gt;&amp; a, Args&amp;&amp;... args);
+<br/><tab/>   template&lt;class T, class U, class... Args>
+<br/><tab2/>	constexpr variant&lt;T&gt; make_variant(allocator_arg_t, const polymorphic_allocator&lt;&gt;&amp; a, initializer_list&lt;U&gt; il, Args&amp;&amp;... args);
+<br/>
+ <br/><tab/> // [pmrvariant.hash], hash support
+<br/><tab/>   template&lt;class T&gt; struct hash&lt;variant&lt;T&gt;&gt;;
+<br/>}
+
+</code></ins></blockquote></p>
+
+<p><h3><ins> Class template variant  [variant.pmrvariant]</ins></h3></p>
+<p>
+<blockquote><ins>
+<code>
+namespace std::pmr {
+ <br/><tab/>   template&lt;class T&gt;
+<br/><tab/> class variant <i> see below</i>{
+<br/><tab/> public:
+<br/><tab2/> using value_type = T;
+<br/><tab2/> using allocator_type = polymorphic_allocator&lt;&gt;; // <i>not always defined, see below</i>
+<br/>
+<br/><tab2/>    // [pmrvariant.ctor], constructors
+    <br/><tab2/>variant() noexcept;
+    <br/><tab2/>variant(nullopt_t) noexcept;
+    <br/><tab2/>variant(const variant&amp;);
+    <br/><tab2/>variant(variant&amp;&amp;) noexcept(<i>see below</i>);
+    <br/><tab2/>variant(const std::variant&amp;);
+    <br/><tab2/>variant(std::variant&amp;&amp;);	
+    <br/><tab2/>template&lt;class... Args&gt;
+      <br/><tab2/><tab/>explicit variant(in_place_t, Args&amp;&amp;...);
+    <br/><tab2/>template&lt;class U, class... Args&gt;
+      <br/><tab2/><tab/>explicit variant(in_place_t, initializer_list&lt;U&gt;, Args&amp;&amp;...);
+    <br/><tab2/>template&lt;class U = T&gt;
+      <br/><tab2/><tab/>explicit(<i>see below</i>) variant(U&amp;&amp;);
+    <br/><tab2/>template&lt;class U&gt;
+      <br/><tab2/><tab/>explicit(<i>see below</i>) variant(const variant&lt;U&gt;&amp;);
+    <br/><tab2/>template&lt;class U&gt;
+      <br/><tab2/><tab/>explicit(<i>see below</i>) variant(variant&lt;U&gt;&amp;&amp;);
+	<br/><tab2/>template&lt;class U&gt;
+      <br/><tab2/><tab/>explicit(<i>see below</i>) variant(const std::variant&lt;U&gt;&amp;);
+    <br/><tab2/>template&lt;class U&gt;
+      <br/><tab2/><tab/>explicit(<i>see below</i>) variant(std::variant&lt;U&gt;&amp;&amp;);
+      <br/>
+    <br/><tab2/>// allocator-extended constructors  
+    <br/><tab2/>variant(allocator_arg_t, const polymorphic_allocator&lt;&gt;&amp;) noexcept; // <i>not always provided, see below</i>
+    <br/><tab2/>variant(allocator_arg_t, const polymorphic_allocator&lt;&gt;&amp;, nullopt_t) noexcept; // <i>not always provided, see below</i>
+    <br/><tab2/>variant(allocator_arg_t, const polymorphic_allocator&lt;&gt;&amp;, const variant&amp;); // <i>not always provided, see below</i>
+    <br/><tab2/>variant(allocator_arg_t, const polymorphic_allocator&lt;&gt;&amp;, variant&amp;&amp;) noexcept(<i>see below</i>); // <i>not always provided, see below</i>
+    <br/><tab2/>variant(allocator_arg_t, const polymorphic_allocator&lt;&gt;&amp;, const std::variant&amp;); // <i>not always provided, see below</i>
+    <br/><tab2/>variant(allocator_arg_t, const polymorphic_allocator&lt;&gt;&amp;, std::variant&amp;&amp;); // <i>not always provided, see below</i>
+    <br/><tab2/>template&lt;class... Args&gt;
+      <br/><tab2/><tab/>explicit variant(allocator_arg_t, const polymorphic_allocator&lt;&gt;&amp;, in_place_t,  Args&amp;&amp;...); // <i>not always provided, see below</i>
+    <br/><tab2/>template&lt;class U, class... Args&gt;
+      <br/><tab2/><tab/>explicit variant(allocator_arg_t, const polymorphic_allocator&lt;&gt;&amp;, in_place_t, initializer_list&lt;U&gt;, Args&amp;&amp;...); // <i>not always provided, see below</i>
+    <br/><tab2/>template&lt;class U = T&gt; 
+      <br/><tab2/><tab/>explicit(<i>see below</i>) variant(allocator_arg_t, const polymorphic_allocator&lt;&gt;&amp;,U&amp;&amp;); // <i>not always provided, see below</i>
+    <br/><tab2/>template&lt;class U&gt;
+      <br/><tab2/><tab/>explicit(<i>see below</i>) variant(allocator_arg_t, const polymorphic_allocator&lt;&gt;&amp;,const variant&lt;U&gt;&amp;); // <i>not always provided, see below</i>
+    <br/><tab2/>template&lt;class U&gt;
+      <br/><tab2/><tab/>explicit(<i>see below</i>) variant(allocator_arg_t, const polymorphic_allocator&lt;&gt;&amp;,variant&lt;U&gt;&amp;&amp;); // <i>not always provided, see below</i>
+	<br/><tab2/>template&lt;class U&gt;
+      <br/><tab2/><tab/>explicit(<i>see below</i>) variant(allocator_arg_t, const polymorphic_allocator&lt;&gt;&amp;,const std::variant&lt;U&gt;&amp;); // <i>not always provided, see below</i>
+    <br/><tab2/>template&lt;class U&gt;
+      <br/><tab2/><tab/>explicit(<i>see below</i>) variant(allocator_arg_t, const polymorphic_allocator&lt;&gt;&amp;,std::variant&lt;U&gt;&amp;&amp;);  // <i>not always provided, see below</i>
+<br/>
+<br/><tab2/>    // [pmrvariant.dtor], destructor
+<br/><tab2/>    ~variant();
+<br/>
+<br/><tab2/>    // [pmrvariant.assign], assignment
+<br/><tab2/>    variant&amp; operator=(nullopt_t) noexcept;
+<br/><tab2/>    variant&amp; operator=(const variant&amp;);
+<br/><tab2/>    variant&amp; operator=(variant&amp;&amp;) noexcept(<i>see below</i>);
+<br/><tab2/>    template&lt;class U = T&gt; variant&amp; operator=(U&amp;&amp;);
+<br/><tab2/>    template&lt;class U&gt; variant&amp; operator=(const variant&lt;U&gt;&amp;);
+<br/><tab2/>    template&lt;class U&gt; variant&amp; operator=(variant&lt;U&gt;&amp;&amp;);
+<br/><tab2/>    template&lt;class U&gt; variant&amp; operator=(const std::variant&lt;U&gt;&amp;);
+<br/><tab2/>    template&lt;class U&gt; variant&amp; operator=(std::variant&lt;U&gt;&amp;&amp;);
+<br/><tab2/>    template&lt;class... Args&gt;> T&amp; emplace(Args&amp;&amp;...);
+<br/><tab2/>    template&lt;class U, class... Args&gt; T&amp; emplace(initializer_list&lt;U&gt;, Args&amp;&amp;...);
+<br/>
+<br/><tab2/>    // [pmrvariant.swap], swap
+<br/><tab2/>    void swap(variant&amp;) noexcept(<i>see below</i>);
+<br/>
+<br/><tab2/>    // [pmrvariant.observe], observers
+<br/><tab2/>    const T* operator-&gt;() const;
+<br/><tab2/>    T* operator-&gt;();
+<br/><tab2/>    const T&amp; operator*() const&amp;;
+<br/><tab2/>    T&amp; operator*() &amp;;
+<br/><tab2/>    T&amp;&amp; operator*() &amp;&amp;;
+<br/><tab2/>    const T&amp;&amp; operator*() const&amp;&amp;;
+<br/><tab2/>    explicit operator bool() const noexcept;
+<br/><tab2/>    bool has_value() const noexcept;
+<br/><tab2/>    const T&amp; value() const&amp;;
+<br/><tab2/>    T&amp; value() &amp;;
+<br/><tab2/>    T&amp;&amp; value() &amp;&amp;;
+<br/><tab2/>    const T&amp;&amp; value() const&amp;&amp;;
+<br/><tab2/>    template&lt;class U&gt; T value_or(U&amp;&amp;) const&amp;;
+<br/><tab2/>    template&lt;class U&gt; T value_or(U&amp;&amp;) &amp;&amp;;
+<br/><tab2/>    template&lt;class U&gt; T value_or(allocator_arg_t, const polymorphic_allocator&lt;&gt;&amp;, U&amp;&amp;) const&amp;; // <i>not always provided, see below</i>
+<br/><tab2/>    template&lt;class U&gt; T value_or(allocator_arg_t, const polymorphic_allocator&lt;&gt;&amp;, U&amp;&amp;) &amp;&amp;; // <i>not always provided, see below</i>
+<br/><tab2/>    allocator_type get_allocator() const noexcept;
+
+<br/>
+ <br/><tab2/>   // [pmrvariant.mod], modifiers
+<br/><tab2/>    void reset() noexcept;
+<br/>
+<br/><tab/>  private:
+<br/><tab2/>    T* val;         // exposition only
+<br/><tab2/>    const polymorphic_allocator&lt;&gt;  <i>alloc</i>;         // <i> exposition only; not always provided, see below</i>
+<br/><tab/>  };
+<br/>
+<br/><tab/>   template&lt;class T&gt;
+<br/><tab/>   variant(T) -&gt; variant&lt;T&gt;;
+<ins>
+<br/><tab/>   template&lt;class T&gt;
+<br/><tab/>   variant(const std::variant&lt;T&gt;&amp;) -&gt; variant&lt;T&gt;;
+<br/><tab/>   template&lt;class T&gt;
+<br/><tab/>   variant(std::variant&lt;T&gt;&amp;&amp;) -&gt; variant&lt;T&gt;;
+<br/>
+<br/>}
+</code>
+</blockquote></ins></p>
+
+<blockquote><ins>Any instance of variant&lt;T&gt; at any given time either contains a value or does not contain a value. 
+When an instance of <i>variant</i>&lt;T&gt; contains a value, it means that an object of type <tt>T</tt> 
+is allocated within the storage of the <i>variant</i> object. Implementations are not permitted to use 
+additional storage, such as dynamic memory, to allocate its contained value. The contained value shall be allocated in a 
+region of the <i>variant</i>&lt;T&gt; storage suitably aligned for the type <tt>T</tt> and, if <tt>uses-poly-alloc</tt> is true,
+constructed by uses-allocator construction 
+with allocator <tt><i>alloc</i></tt>. When an object of type <i>variant</i>&lt;T&gt; is contextually 
+converted to bool, the conversion returns true if the object contains a value; otherwise the conversion returns false.
+</ins></blockquote>
+<blockquote><ins>Member <tt>val</tt> is provided for exposition only. When an <i>variant</i>&lt;T&gt;
+object contains a value, val points to the contained value.
+</ins></blockquote>
+<blockquote><ins>If and only if <tt>uses-poly-alloc</tt> is <tt>false</tt>, variant&lt;T&gt; publicly inherits from 
+std::variant&lt;T&gt;
+</ins></blockquote>
+<blockquote><ins>If and only if <tt>uses-poly-alloc</tt> is <tt>true</tt>, the following applies :
+<br/> - <tt>allocator_type</tt> will be defined,
+<br/> - exposition only member <tt><i>alloc</i></tt> will be provided and will be used to create the contained value, if any, and
+<br/> - if <tt>T</tt> provides a <tt>get_allocator()</tt> member function whose return type is convertible to <tt>polymorphic_allocator&lt;&gt;</tt>, the implementation is 
+allowed to assume that the allocator used for constructing the element is the same allocator as returned 
+by <tt>T::get_allocator()</tt>. [<i>Note:</i> In such an implementation, <tt>pmr::variant&lt;pmr::string&gt;</tt> 
+will be zero-overhead compared to <tt>variant&lt;pmr::string&gt;</tt>. -- <i>end note</i>]
+</ins></blockquote>
+<blockquote><ins><tt>T</tt> shall be a type other than <tt><i>cv</i> in_­place_­t</tt>, <tt><i>cv</i> allocator_arg_­t</tt>, or <tt><i>cv</i> nullopt_­t</tt> 
+that meets the <i>Cpp17Destructible</i> requirements (Table 30).</ins></blockquote>
+
+
+
+<p><h4><ins> Constructors [pmrvariant.ctor]</ins></h4></p>
+<p><blockquote><ins>
+<br/><code>variant() noexcept;</code>
+<br/><code>variant(nullopt_t) noexcept;</code>
+<br/><tab/><i>Effects:</i> If <tt>uses-poly-alloc</tt> is <tt>true</tt>, <tt><i>alloc</i></tt> is default initialized</tt>
+<br/><tab/><i>Ensures:</i> *this does not contain a value.
+<br/><tab/><i>Remarks:</i> No contained value is initialized.
+<br/>
+<br/><code>variant(const variant&amp;);</code>
+<br/><tab/><i>Effects:</i> If <tt>uses-poly-alloc</tt> is <tt>true</tt>, <tt><i>alloc</i></tt> is default initialized</tt>. 
+If <tt>rhs</tt> contains a value, constructs the contained value with uses-allocator construction ([allocator.uses.construction]) with <i>alloc</i> and 
+the expression <tt>*rhs</tt>.
+<br/><tab/><i>Ensures:</i> <tt>bool(rhs) == bool(*this)</tt>.
+<br/><tab/><i>Throws:</i> Any exception thrown by the selected constructor of <tt>T</tt>.
+<br/><tab/><i>Mandates:</i><tt>is_­copy­_constructible_­v&lt;T&gt;</tt> is true.
+
+<br/>
+<br/><code>variant(variant&amp;&amp; rhs) noexcept(<i>see below</i>)</code>
+<br/><tab/><i>Effects:</i> If <tt>uses-poly-alloc</tt> is <tt>true</tt>, <tt><i>alloc</i></tt> is initialized with <tt>rhs.<i>alloc</i></tt>. 
+If <tt>rhs</tt> contains a value, constructs the contained value with uses-allocator construction ([allocator.uses.construction]) with <i>alloc</i> and 
+the expression <tt>std​::​move(*rhs)</tt>. <tt>bool(rhs)</tt> is unchanged.
+<br/><tab/><i>Ensures:</i> <tt>bool(rhs) == bool(*this)</tt>.
+<br/><tab/><i>Throws:</i> Any exception thrown by the selected constructor of <tt>T</tt>.
+<br/><tab/><i>Remarks:</i> The expression inside <tt>noexcept</tt> is equivalent to <tt>is_­nothrow_­move_­constructible_­v&lt;T&gt;</tt>.
+<br/><tab/><i>Mandates:</i><tt>is_­move_­constructible_­v&lt;T&gt;</tt> is true.
+<br/>
+<br/><code>variant(const std::variant&amp;);</code>
+<br/><tab/><i>Effects:</i> If <tt>uses-poly-alloc</tt> is <tt>true</tt>, <tt><i>alloc</i></tt> is default initialized</tt>. 
+If <tt>rhs</tt> contains a value, initializes the contained value 
+with the expression <tt>*rhs</tt>.
+<br/><tab/><i>Ensures:</i> <tt>bool(rhs) == bool(*this)</tt>.
+<br/><tab/><i>Throws:</i> Any exception thrown by the selected constructor of <tt>T</tt>.
+<br/><tab/><i>Mandates:</i><tt>is_­copy­_constructible_­v&lt;T&gt;</tt> is true.
+
+<br/>
+<br/><code>variant(std::variant&amp;&amp; rhs)</code>
+<br/><tab/><i>Effects:</i> If <tt>uses-poly-alloc</tt> is <tt>true</tt>, <tt><i>alloc</i></tt> is initialized with <tt>rhs.<i>alloc</i></tt>. 
+If <tt>rhs</tt> contains a value, constructs the contained value with uses-allocator construction ([allocator.uses.construction]) 
+with <i>alloc</i> and the expression <tt>std​::​move(*rhs)</tt>. <tt>bool(rhs)</tt> is unchanged.
+<br/><tab/><i>Ensures:</i> <tt>bool(rhs) == bool(*this)</tt>.
+<br/><tab/><i>Throws:</i> Any exception thrown by the selected constructor of <tt>T</tt>.
+<br/><tab/><i>Mandates:</i><tt>is_­move_­constructible_­v&lt;T&gt;</tt> is true.
+
+
+<br/>
+<br/><code>template&lt;class... Args&gt; explicit variant(in_place_t, Args&amp;&amp;... args);</code>
+<br/><tab/><i>Effects:</i> If <tt>uses-poly-alloc</tt> is <tt>true</tt>, <tt><i>alloc</i></tt> is default initialized</tt>.  
+Constructs the contained value with uses-allocator construction ([allocator.uses.construction]) with <i>alloc</i> and <tt>std​::​forward&lt;Args&gt;(args)....</tt>. 
+<br/><tab/><i>Ensures:</i> <tt>*this</tt> contains a value..
+<br/><tab/><i>Throws:</i> Any exception thrown by the selected constructor of <tt>T</tt>.
+<br/><tab/><i>Mandates:</i><tt>is_­copy_­constructible_­v&lt;T&gt;</tt> is true.
+
+<br/>
+<br/><code>template&lt;class... Args&gt; explicit variant(in_place_t, initializer_list&lt;U&gt; il, Args&amp;&amp;... args);</code>
+<br/><tab/><i>Effects:</i>  If <tt>uses-poly-alloc</tt> is <tt>true</tt>, <tt><i>alloc</i></tt> is default initialized</tt>. 
+Constructs the contained value with uses-allocator construction ([allocator.uses.construction]) with <i>alloc</i>, <tt>il, and std​::​forward&lt;Args&gt;(args)....</tt>.
+<br/><tab/><i>Ensures:</i> <tt>*this</tt> contains a value..
+<br/><tab/><i>Throws:</i> Any exception thrown by the selected constructor of <tt>T</tt>.
+<br/><tab/><i>Mandates:</i><tt>is_­constructible_­v&lt;T, initializer_­list&lt;U&gt;&amp;, Args&amp;&amp;...&gt;</tt> is true.  
+<br/>
+<br/><code>template&lt;class U = T&gt; explicit(<i>see below</i>) variant(U&amp;&amp; rhs);</code>
+<br/><tab/><i>Effects:</i>If <tt>uses-poly-alloc</tt> is <tt>true</tt>, <tt><i>alloc</i></tt> is default initialized</tt>.
+Constructs the contained value with uses-allocator construction ([allocator.uses.construction]) with <i>alloc</i> and <tt> std​::​forward&lt;U&gt;(rhs)</tt>. 
+<br/><tab/><i>Ensures:</i> <tt>*this</tt> contains a value.
+<br/><tab/><i>Throws:</i> Any exception thrown by the selected constructor of <tt>T</tt>.
+<br/><tab/><i>Remarks:</i>The expression inside <tt>explicit</tt> is equivalent to:
+<br/><tab2/><tt>!is_convertible_v&lt;U, T&gt;</tt> 
+<br/><tab/><i>Mandates:</i>
+<br/><tab2/> - <tt>is_­constructible_­v&lt;T, U&amp;&amp;&gt;</tt> is <tt>true</tt>,
+<br/><tab2/> - <tt>is_­same_­v&lt;remove_­cvref_­t&lt;U&gt;, in_­place_­t&gt</tt>
+is <tt>false</tt>, and
+<br/><tab2/> - <tt>is_­same_­v&lt;remove_­cvref_­t&lt;U&gt;,variant&gt</tt> is <tt>false</tt>. 
+
+<br/>
+<br/><code>template&lt;class U&gt; explicit(<i>see below</i>) variant(const variant&lt;U&gt;&amp; rhs);</code>
+<br/><tab/><i>Effects:</i>If <tt>uses-poly-alloc</tt> is <tt>true</tt>, <tt><i>alloc</i></tt> is default initialized</tt>. 
+If <tt>rhs</tt> contains a value, constructs the contained value with uses-allocator construction ([allocator.uses.construction]) 
+with <i>alloc</i> and <tt>*rhs</tt>. 
+<br/><tab/><i>Ensures:</i> <tt>bool(rhs) == bool(*this)</tt>.
+<br/><tab/><i>Throws:</i> Any exception thrown by the selected constructor of <tt>T</tt>.
+<br/><tab/><i>Remarks:</i>The expression inside <tt>explicit</tt> is equivalent to:
+<br/><tab2/><tt>!is_convertible_v&lt;const U&amp;, T&gt;</tt>
+<br/><tab/><i>Mandates:</i>
+<br/><tab2/> - <tt>is_­constructible_­v&lt;T, const U&amp;&gt;</tt> is <tt>true</tt>, 
+<br/><tab2/> - <tt>is_­constructible_­v&lt;T, std::variant&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>, 
+<br/><tab2/> - <tt>is_­constructible_­v&lt;T, variant&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>, 
+<br/><tab2/> - <tt>is_­constructible_­v&lt;T, std::variant&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>, 
+<br/><tab2/> - <tt>is_­constructible_­v&lt;T, variant&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>, 
+<br/><tab2/> - <tt>is_­constructible_­v&lt;T, const std::variant&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>, 
+<br/><tab2/> - <tt>is_­constructible_­v&lt;T, const variant&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>, 
+<br/><tab2/> - <tt>is_­constructible_­v&lt;T, const std::variant&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>, 
+<br/><tab2/> - <tt>is_­constructible_­v&lt;T, const variant&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>, 
+<br/><tab2/> - <tt>is_­convertible_­v&lt;std::variant&lt;U&gt;&amp;, T&gt;</tt> is <tt>false</tt>, 
+<br/><tab2/> - <tt>is_­convertible_­v&lt;variant&lt;U&gt;&amp;, T&gt;</tt> is <tt>false</tt>, 
+<br/><tab2/> - <tt>is_­convertible_­v&lt;std::variant&lt;U&gt;&amp;&amp;, T&gt;</tt> is <tt>false</tt>, 
+<br/><tab2/> - <tt>is_­convertible_­v&lt;variant&lt;U&gt;&amp;&amp;, T&gt;</tt> is <tt>false</tt>, 
+<br/><tab2/> - <tt>is_­convertible_­v&lt;const std::variant&lt;U&gt;&amp;, T&gt;</tt> is <tt>false</tt>, 
+<br/><tab2/> - <tt>is_­convertible_­v&lt;const variant&lt;U&gt;&amp;, T&gt;</tt> is <tt>false</tt>, 
+<br/><tab2/> - <tt>is_­convertible_­v&lt;const std::variant&lt;U&gt;&amp;&amp;, T&gt;</tt> is <tt>false</tt>, and
+<br/><tab2/> - <tt>is_­convertible_­v&lt;const variant&lt;U&gt;&amp;&amp;, T&gt;</tt> is <tt>false</tt> 
+<br/>     
+
+
+<br/>
+<br/><code>template&lt;class U&gt; explicit(<i>see below</i>) variant(variant&lt;U&gt;&amp;&amp; rhs);</code>
+<br/><tab/><i>Effects:</i>If <tt>uses-poly-alloc</tt> is <tt>true</tt>, <tt><i>alloc</i></tt> is default initialized</tt>.
+If <tt>rhs</tt> contains a value, constructs the contained value with uses-allocator construction ([allocator.uses.construction]) 
+with <i>alloc</i> and <tt>std​::​move(*rhs)</tt>. <tt>bool(rhs)</tt> is unchanged.
+<br/><tab/><i>Ensures:</i> <tt>bool(rhs) == bool(*this)</tt>.
+<br/><tab/><i>Throws:</i> Any exception thrown by the selected constructor of <tt>T</tt>.
+<br/><tab/><i>Remarks:</i>The expression inside <tt>explicit</tt> is equivalent to:
+<br/><tab2/><tt>!is_convertible_v&lt;U, T&gt;</tt 
+<br/><tab/><i>Mandates:</i>
+<br/><tab2/> - <tt>is_­constructible_­v&lt;T,U&amp;&amp;&gt;</tt> is <tt>true</tt>, 
+<br/><tab2/> - <tt>is_­constructible_­v&lt;T, std::variant&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>, 
+<br/><tab2/> - <tt>is_­constructible_­v&lt;T, variant&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>, 
+<br/><tab2/> - <tt>is_­constructible_­v&lt;T, std::variant&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>, 
+<br/><tab2/> - <tt>is_­constructible_­v&lt;T, variant&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>, 
+<br/><tab2/> - <tt>is_­constructible_­v&lt;T, const std::variant&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>, 
+<br/><tab2/> - <tt>is_­constructible_­v&lt;T, const variant&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>, 
+<br/><tab2/> - <tt>is_­constructible_­v&lt;T, const std::variant&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>, 
+<br/><tab2/> - <tt>is_­constructible_­v&lt;T, const variant&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>, 
+<br/><tab2/> - <tt>is_­convertible_­v&lt;std::variant&lt;U&gt;&amp;, T&gt;</tt> is <tt>false</tt>, 
+<br/><tab2/> - <tt>is_­convertible_­v&lt;variant&lt;U&gt;&amp;, T&gt;</tt> is <tt>false</tt>, 
+<br/><tab2/> - <tt>is_­convertible_­v&lt;std::variant&lt;U&gt;&amp;&amp;, T&gt;</tt> is <tt>false</tt>, 
+<br/><tab2/> - <tt>is_­convertible_­v&lt;variant&lt;U&gt;&amp;&amp;, T&gt;</tt> is <tt>false</tt>, 
+<br/><tab2/> - <tt>is_­convertible_­v&lt;const std::variant&lt;U&gt;&amp;, T&gt;</tt> is <tt>false</tt>, 
+<br/><tab2/> - <tt>is_­convertible_­v&lt;const variant&lt;U&gt;&amp;, T&gt;</tt> is <tt>false</tt>, 
+<br/><tab2/> - <tt>is_­convertible_­v&lt;const std::variant&lt;U&gt;&amp;&amp;, T&gt;</tt> is <tt>false</tt>, and
+<br/><tab2/> - <tt>is_­convertible_­v&lt;const variant&lt;U&gt;&amp;&amp;, T&gt;</tt> is <tt>false</tt> 
+<br/>    
+
+<br/>
+<br/><code>template&lt;class U&gt; explicit(<i>see below</i>) variant(const std::variant&lt;U&gt;&amp; rhs);</code>
+<br/><tab/><i>Effects:</i>If <tt>uses-poly-alloc</tt> is <tt>true</tt>, <tt><i>alloc</i></tt> is default initialized</tt>.
+If <tt>rhs</tt> contains a value, constructs the contained value with uses-allocator construction ([allocator.uses.construction]) 
+with <i>alloc</i> and <tt>*rhs</tt>. 
+<br/><tab/><i>Ensures:</i> <tt>bool(rhs) == bool(*this)</tt>.
+<br/><tab/><i>Throws:</i> Any exception thrown by the selected constructor of <tt>T</tt>.
+<br/><tab/><i>Remarks:</i>The expression inside <tt>explicit</tt> is equivalent to:
+<br/><tab2/><tt>!is_convertible_v&lt;const U&amp;, T&gt;</tt>
+<br/><tab/><i>Mandates:</i>
+<br/><tab2/> - <tt>is_­constructible_­v&lt;T, const U&amp;&gt;</tt> is <tt>true</tt>,
+<br/><tab2/> - <tt>is_­constructible_­v&lt;T, std::variant&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>,
+<br/><tab2/> - <tt>is_­constructible_­v&lt;T, variant&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>,
+<br/><tab2/> - <tt>is_­constructible_­v&lt;T, std::variant&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>,
+<br/><tab2/> - <tt>is_­constructible_­v&lt;T, variant&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>,
+<br/><tab2/> - <tt>is_­constructible_­v&lt;T, const std::variant&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>,
+<br/><tab2/> - <tt>is_­constructible_­v&lt;T, const variant&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>,
+<br/><tab2/> - <tt>is_­constructible_­v&lt;T, const std::variant&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>,
+<br/><tab2/> - <tt>is_­constructible_­v&lt;T, const variant&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>,
+<br/><tab2/> - <tt>is_­convertible_­v&lt;std::variant&lt;U&gt;&amp;, T&gt;</tt> is <tt>false</tt>,
+<br/><tab2/> - <tt>is_­convertible_­v&lt;variant&lt;U&gt;&amp;, T&gt;</tt> is <tt>false</tt>,
+<br/><tab2/> - <tt>is_­convertible_­v&lt;std::variant&lt;U&gt;&amp;&amp;, T&gt;</tt> is <tt>false</tt>,
+<br/><tab2/> - <tt>is_­convertible_­v&lt;variant&lt;U&gt;&amp;&amp;, T&gt;</tt> is <tt>false</tt>,
+<br/><tab2/> - <tt>is_­convertible_­v&lt;const std::variant&lt;U&gt;&amp;, T&gt;</tt> is <tt>false</tt>,
+<br/><tab2/> - <tt>is_­convertible_­v&lt;const variant&lt;U&gt;&amp;, T&gt;</tt> is <tt>false</tt>,
+<br/><tab2/> - <tt>is_­convertible_­v&lt;const std::variant&lt;U&gt;&amp;&amp;, T&gt;</tt> is <tt>false</tt>, and
+<br/><tab2/> - <tt>is_­convertible_­v&lt;const variant&lt;U&gt;&amp;&amp;, T&gt;</tt> is <tt>false</tt>
+<br/>     
+
+
+<br/>
+<br/><code>template&lt;class U&gt; explicit(<i>see below</i>) variant(std::variant&lt;U&gt;&amp;&amp; rhs);</code>
+<br/><tab/><i>Effects:</i>If <tt>uses-poly-alloc</tt>
+ is <tt>true</tt>, <tt><i>alloc</i></tt> is default initialized</tt>. 
+If <tt>rhs</tt> contains a value, constructs the contained value with uses-allocator construction ([allocator.uses.construction]) 
+with <i>alloc</i> and <tt>std​::​move(*rhs)</tt>. 
+<tt>bool(rhs)</tt> is unchanged.
+<br/><tab/><i>Ensures:</i> <tt>bool(rhs) == bool(*this)</tt>.
+<br/><tab/><i>Throws:</i> Any exception thrown by the selected constructor of <tt>T</tt>.
+<br/><tab/><i>Remarks:</i><br/><tab/>The expression inside <tt>explicit</tt> is equivalent to:
+<br/><tab2/><tt>!is_convertible_v&lt;U, T&gt;</tt>
+<br/><tab/><i>Mandates:</i>
+<br/><tab2/> - <tt>is_­constructible_­v&lt;T,U&amp;&amp;&gt;</tt> is <tt>true</tt>, 
+<br/><tab2/> - <tt>is_­constructible_­v&lt;T, std::variant&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>, 
+<br/><tab2/> - <tt>is_­constructible_­v&lt;T, variant&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>, 
+<br/><tab2/> - <tt>is_­constructible_­v&lt;T, std::variant&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>, 
+<br/><tab2/> - <tt>is_­constructible_­v&lt;T, variant&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>, 
+<br/><tab2/> - <tt>is_­constructible_­v&lt;T, const std::variant&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>, 
+<br/><tab2/> - <tt>is_­constructible_­v&lt;T, const variant&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>, 
+<br/><tab2/> - <tt>is_­constructible_­v&lt;T, const std::variant&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>, 
+<br/><tab2/> - <tt>is_­constructible_­v&lt;T, const variant&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>, 
+<br/><tab2/> - <tt>is_­convertible_­v&lt;std::variant&lt;U&gt;&amp;, T&gt;</tt> is <tt>false</tt>, 
+<br/><tab2/> - <tt>is_­convertible_­v&lt;variant&lt;U&gt;&amp;, T&gt;</tt> is <tt>false</tt>, 
+<br/><tab2/> - <tt>is_­convertible_­v&lt;std::variant&lt;U&gt;&amp;&amp;, T&gt;</tt> is <tt>false</tt>, 
+<br/><tab2/> - <tt>is_­convertible_­v&lt;variant&lt;U&gt;&amp;&amp;, T&gt;</tt> is <tt>false</tt>, 
+<br/><tab2/> - <tt>is_­convertible_­v&lt;const std::variant&lt;U&gt;&amp;, T&gt;</tt> is <tt>false</tt>, 
+<br/><tab2/> - <tt>is_­convertible_­v&lt;const variant&lt;U&gt;&amp;, T&gt;</tt> is <tt>false</tt>, 
+<br/><tab2/> - <tt>is_­convertible_­v&lt;const std::variant&lt;U&gt;&amp;&amp;, T&gt;</tt> is <tt>false</tt>, and 
+<br/><tab2/> - <tt>is_­convertible_­v&lt;const variant&lt;U&gt;&amp;&amp;, T&gt;</tt> is <tt>false</tt> 
+<br/>  
+    <br/>
+    
+    
+<code> 
+	<br/>variant(allocator_arg_t, const polymorphic_allocator&lt;&gt;&amp;) noexcept;
+  <br/>variant(allocator_arg_t, const polymorphic_allocator&lt;&gt;&amp;, nullopt_t) noexcept;
+    <br/>variant(allocator_arg_t, const polymorphic_allocator&lt;&gt;&amp;, const variant&amp;);
+    <br/>variant(allocator_arg_t, const polymorphic_allocator&lt;&gt;&amp;, variant&amp;&amp;) noexcept(<i>see below</i>);
+	
+    <br/>variant(allocator_arg_t, const polymorphic_allocator&lt;&gt;&amp;, const std::variant&amp;);
+    <br/>variant(allocator_arg_t, const polymorphic_allocator&lt;&gt;&amp;, std::variant&amp;&amp;);
+    <br/>template&lt;class... Args&gt;
+      <br/><tab/>explicit variant(allocator_arg_t, const polymorphic_allocator&lt;&gt;&amp;, in_place_t, Args&amp;&amp;...);
+    <br/>template&lt;class U, class... Args&gt;
+      <br/><tab/>explicit variant(allocator_arg_t, const polymorphic_allocator&lt;&gt;&amp;, in_place_t, initializer_list&lt;U&gt;, Args&amp;&amp;...);
+    <br/>template&lt;class U = T&gt;
+      <br/><tab/>explicit(<i>see below</i>) variant(allocator_arg_t, const polymorphic_allocator&lt;&gt;&amp;,U&amp;&amp;);
+    <br/>template&lt;class U&gt;
+      <br/><tab/>explicit(<i>see below</i>) variant(allocator_arg_t, const polymorphic_allocator&lt;&gt;&amp;,const variant&lt;U&gt;&amp;);
+    <br/>template&lt;class U&gt;
+      <br/><tab/>explicit(<i>see below</i>) variant(allocator_arg_t, const polymorphic_allocator&lt;&gt;&amp;,variant&lt;U&gt;&amp;&amp;);
+	<br/>template&lt;class U&gt;
+      <br/><tab/>explicit(<i>see below</i>) variant(allocator_arg_t, const polymorphic_allocator&lt;&gt;&amp;,const std::variant&lt;U&gt;&amp;);
+    <br/>template&lt;class U&gt;
+      <br/><tab/>explicit(<i>see below</i>) variant(allocator_arg_t, const polymorphic_allocator&lt;&gt;&amp;,std::variant&lt;U&gt;&amp;&amp;);  
+ </code>
+<br/><tab/><i>Constraints:</i> <tt>uses_allocator&lt;T,polymorphic_allocator&lt;&gt;&gt;</tt> is true;
+<br/><tab/><i>Effects:</i> Equivalent to the preceding constructors except that <tt><i>alloc</i></tt> is initialized with <tt>a</tt>.
+      </blockquote></ins></p>
+
+<p><h4><ins> Destructor [pmrvariant.dtor]</ins></h4></p>
+<blockquote><ins>
+<br/><tt>~variant();</tt>
+<br/><tab/><i>Effects:</i> If <tt>is_­trivially_­destructible_­v&lt;T&gt; != true</tt> and <tt>*this</tt> contains a value, calls
+<tt>val->T::~T()</tt>
+<br/><tab/><i>Remarks:</i> If <tt>is_­trivially_­destructible_­v&lt;T&gt;</tt> is <tt>true</tt>, then this destructor is trivial.
+</ins></blockquote>
+
+<p><h4><ins> Assignment [pmrvariant.assign]</ins></h4></p>
+<blockquote><ins>
+<br/><tt>variant&lt;T&gt;&amp; operator=(nullopt_t) noexcept;</tt>
+<br/><tab/><i>Effects:</i> If <tt>*this</tt> contains a value, calls <tt>val->T::~T()</tt> to destroy the contained value; otherwise
+no effect.
+<br/><tab/><i>Remarks:</i> <tt>*this</tt>
+<br/><tab/><i>Ensures:</i> <tt>*this</tt> does not contain a value.
+
+
+<br/>
+<br/><tt>variant&lt;T&gt;&amp; operator=(const variant&amp; rhs);</tt>
+<br/><tab/><i>Effects:</i> See Table
+<blockquote><table border="1">
+<caption><ins>Table &mdash; <tt>variant operator=(const variant&amp; rhs)</tt> effects</ins></caption>
+<tr>
+<th></th>
+<th><ins><tt>*this</tt> contains a value</ins></th>
+<th><ins><tt>*this</tt> does not contain a value</ins></th>
+</tr>
+<tr>
+<td><ins><tt>rhs</tt> contains a value</ins></td>
+<td><ins>assigns <tt>*rhs</tt> to the contained value</ins></td>
+<td><ins>initializes the contained value with <tt>*rhs</tt>. 
+If <tt>uses-poly-alloc</tt>
+ is <tt>true</tt>, initialization is done by uses-allocator construction 
+with allocator <tt><i>alloc</i></tt> </ins></td>
+</tr>
+<tr>
+<td><ins><tt>rhs</tt> does not contain a value</ins></td>
+<td><ins>destroys the contained value by calling <tt>val->T::~T()</tt></ins></td>
+<td><ins>no effect</ins></td>
+</tr>
+</table></blockquote>
+<br/><tab/><i>Returns:</i> <tt>*this</tt>.
+<br/><tab/><i>Ensures:</i> <tt>bool(rhs) == bool(*this)</tt>.
+<br/><tab/><i>Remarks:</i> If any exception is thrown, the result of the expression <tt>bool(*this)</tt> remains unchanged.
+If an exception is thrown during the call to <tt>T</tt>'s copy constructor, no effect. If an exception is thrown during the 
+call to <tt>T</tt>'s copy assignment, the state of of its contained value is as defined by the exception safety guarantee of
+is determined by the exception safety guarantee of <tt>T</tt>'s copy assignment.
+This operator shall be defined as deleted unless <tt>is_­copy_­constructible_­v&lt;T&gt;</tt> is <tt>true</tt> and
+<tt>is_­copy_­assignable_­v&lt;T&gt;</tt> is <tt>true</tt>. 
+
+<br/>
+<br/><tt>variant&lt;T&gt;&amp; operator=(variant&amp;&amp; rhs) noexcept(<i>see below</i>);</tt>
+<br/><tab/><i>Effects:</i> See Table
+<blockquote>
+<table border="1">
+<caption><ins>Table &mdash; <tt>variant operator=(variant&amp;&amp; rhs)</tt> effects</ins></caption>
+<tr>
+<th></th>
+<th><ins><tt>*this</tt> contains a value</ins></th>
+<th><ins><tt>*this</tt> does not contain a value</ins></th>
+</tr>
+<tr>
+<td><ins><tt>rhs</tt> contains a value</ins></td>
+<td><ins>assigns <tt>std​::​move(*rhs)</tt> to the contained value</ins></td>
+<td><ins>initializes the contained value with <tt>std​::​move(*rhs)</tt>. 
+If <tt>uses-poly-alloc</tt>
+ is <tt>true</tt>, initialization is done by uses-allocator construction 
+with allocator <tt><i>alloc</i></tt> </ins></td>
+</tr>
+<tr>
+<td><ins><tt>rhs</tt> does not contain a value</ins></td>
+<td><ins>destroys the contained value by calling <tt>val->T::~T()</tt></ins></td>
+<td><ins>no effect</ins></td>
+</tr>
+</table></blockquote>
+<br/><tab/><i>Returns:</i> <tt>*this</tt>.
+<br/><tab/><i>Ensures:</i> <tt>bool(rhs) == bool(*this)</tt>.
+<br/><tab/><i>Remarks:</i> The expression inside <tt>noexcept</tt> is equivalent to:
+<br/><tab2/><code>is_nothrow_move_assignable_v&lt;T&gt; && is_nothrow_move_constructible_v&lt;T&gt;</code>
+<br/><tab/>If any exception is thrown, the result of the expression <tt>bool(*this)</tt> remains unchanged.
+If an exception is thrown during the call to <tt>T</tt>'s move constructor, the state of <tt>*rhs.val</tt> is determined by
+the exception safety guarantee of <tt>T</tt>'s move constructor. If an exception is thrown during the call to <tt>T</tt>'s move assignment,
+the state of <tt>*val</tt> and <tt>*rhs.val</tt> is determined by the exception safety guarantee of <tt>T</tt>'s move assignment.
+<br/><tab/><i>Mandates:</i> is_­move_­constructible_­v&lt;T&gt;</tt> is <tt>true</tt> and
+ <tt>is_­move_­assignable_­v&lt;T&gt;</tt> is <tt>true</tt>.
+
+
+<br/>
+<br/><code>template&lt;class U = T&gt; variant&amp; operator=(U&amp;&amp; v);</code>
+<br/><tab/><i>Effects:</i> If <tt>*this</tt> contains a value, assigns <tt>std​::​forward&lt;U&gt;(v)</tt> to the contained value;
+otherwise initializes the contained value with <tt>std​::​forward&lt;U&gt;(v)</tt>. If <tt>uses-poly-alloc</tt>
+ is <tt>true</tt>, initialization is done by uses-allocator construction
+with allocator <tt><i>alloc</i></tt>
+<br/><tab/><i>Returns:</i> <tt>*this</tt>.
+<br/><tab/><i>Ensures:</i> <tt>*this</tt> contains a value.
+<br/><tab/><i>Remarks: If any exception is thrown, the result of the expression <tt>bool(*this)</tt> remains unchanged.
+If an exception is thrown during the call to <tt>T</tt>'s constructor, the state of <tt>v</tt> is determined by the exception
+safety guarantee of <tt>T</tt>'s constructor. If an exception is thrown during the call to <tt>T</tt>'s assignment,
+the state of <tt>*val</tt> and <tt>v</tt> is determined by the exception safety guarantee of <tt>T</tt>'s assignment.
+<br/><tab/><i>Mandates:</i>
+<br/><tab2/> - <tt>is_­same_­v&lt;remove_­cvref_­t&lt;U&gt;, alloc-variant&gt;</tt> is <tt>false</tt>,
+<br/><tab2/> - <tt>conjunction_­v&lt;is_­scalar&lt;T&gt;, is_­same&lt;T, decay_­t&lt;U&gt;&gt;&gt;</tt> is <tt>false</tt>,
+<br/><tab2/> - <tt>is_­constructible_­v&lt;T,U&gt;</tt> is <tt>true</tt>, and
+<br/><tab2/> - <tt>is_­assignable_­v&lt;T&amp;,U&gt;</tt> is <tt>true</tt>
+
+<br/>
+<br/><tt>template&lt;class U&gt; variant&amp; operator=(const variant&lt;U&gt;&amp; rhs);</tt>
+<br/><tab/><i>Effects:</i> See Table
+<blockquote>
+<table border="1">
+<caption><ins>Table &mdash; <tt>variant operator=(const variant&lt;U&gt;&amp;)</tt> effects</ins></caption>
+<tr>
+<th></th>
+<th><ins><tt>*this</tt> contains a value</ins></th>
+<th><ins><tt>*this</tt> does not contain a value</ins></th>
+</tr>
+<tr>
+<td><ins><tt>rhs</tt> contains a value</ins></td>
+<td><ins>assigns <tt>*rhs</tt> to the contained value</ins></td>
+<td><ins>initializes the contained value with <tt>*rhs</tt>.
+If <tt>uses-poly-alloc</tt>
+ is <tt>true</tt>, initialization is done by uses-allocator construction 
+with allocator <tt><i>alloc</i></tt> </ins></td>
+</tr>
+<tr>
+<td><ins><tt>rhs</tt> does not contain a value</ins></td>
+<td><ins>destroys the contained value by calling <tt>val->T::~T()</tt></ins></td>
+<td><ins>no effect</ins></td>
+</tr>
+</table></blockquote>
+<br/><tab/><i>Returns:</i> <tt>*this</tt>.
+<br/><tab/><i>Ensures:</i> <tt>bool(rhs) == bool(*this)</tt>.
+<br/><tab/><i>Remarks:</i> If any exception is thrown, the result of the expression <tt>bool(*this)</tt> remains unchanged.
+If an exception is thrown during the call to <tt>T</tt>'s constructor, no effect. If an exception is thrown during the call
+to <tt>T</tt>'s assignment, the state of <tt>*val</tt>  is determined by the exception safety guarantee of <tt>T</tt>'s assignment.
+<br/><tab/><i>Mandates:</i>
+<br/><tab2/> - <tt>is_same&lt;T,U&gt;</tt> is <tt>false</tt>,
+<br/><tab2/> - <tt>is_­constructible_­v&lt;T, const U&amp;&gt;</tt> is <tt>true</tt>,
+<br/><tab2/> - <tt>is_assignable&lt;T&amp;, const U&amp;&gt;</tt> is <tt>true</tt>,
+<br/><tab2/> - <tt>is_­constructible_­v&lt;T, std::variant&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>,
+<br/><tab2/> - <tt>is_­constructible_­v&lt;T, variant&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>,
+<br/><tab2/> - <tt>is_­constructible_­v&lt;T, std::variant&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>,
+<br/><tab2/> - <tt>is_­constructible_­v&lt;T, variant&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>,
+<br/><tab2/> - <tt>is_­constructible_­v&lt;T, const std::variant&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>,
+<br/><tab2/> - <tt>is_­constructible_­v&lt;T, const variant&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>,
+<br/><tab2/> - <tt>is_­constructible_­v&lt;T, const std::variant&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>,
+<br/><tab2/> - <tt>is_­constructible_­v&lt;T, const variant&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>,
+<br/><tab2/> - <tt>is_­convertible_­v&lt;std::variant&lt;U&gt;&amp;, T&gt;</tt> is <tt>false</tt>,
+<br/><tab2/> - <tt>is_­convertible_­v&lt;variant&lt;U&gt;&amp;, T&gt;</tt> is <tt>false</tt>,
+<br/><tab2/> - <tt>is_­convertible_­v&lt;std::variant&lt;U&gt;&amp;&amp;, T&gt;</tt> is <tt>false</tt>,
+<br/><tab2/> - <tt>is_­convertible_­v&lt;variant&lt;U&gt;&amp;&amp;, T&gt;</tt> is <tt>false</tt>,
+<br/><tab2/> - <tt>is_­convertible_­v&lt;const std::variant&lt;U&gt;&amp;, T&gt;</tt> is <tt>false</tt>,
+<br/><tab2/> - <tt>is_­convertible_­v&lt;const variant&lt;U&gt;&amp;, T&gt;</tt> is <tt>false</tt>,
+<br/><tab2/> - <tt>is_­convertible_­v&lt;const std::variant&lt;U&gt;&amp;&amp;, T&gt;</tt> is <tt>false</tt>,
+<br/><tab2/> - <tt>is_­convertible_­v&lt;const variant&lt;U&gt;&amp;&amp;, T&gt;</tt> is <tt>false</tt>,
+<br/><tab2/> - <tt>is_assignable_v&lt;T&amp;, std::variant&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>,
+<br/><tab2/> - <tt>is_assignable_v&lt;T&amp;, variant&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>,
+<br/><tab2/> - <tt>is_assignable_v&lt;T&amp;, std::variant&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>,
+<br/><tab2/> - <tt>is_assignable_v&lt;T&amp;, variant&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>,
+<br/><tab2/> - <tt>is_assignable_v&lt;T&amp;, const std::variant&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>,
+<br/><tab2/> - <tt>is_assignable_v&lt;T&amp;, const variant&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>,
+<br/><tab2/> - <tt>is_assignable_v&lt;T&amp;, const std::variant&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>, and
+<br/><tab2/> - <tt>is_assignable_v&lt;T&amp;, const variant&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>
+
+
+<br/>
+<br/><tt>template&lt;class U&gt; variant&amp; operator=(const std::variant&lt;U&gt;&amp; rhs);</tt>
+<br/><tab/><i>Effects:</i> The result of the expression <tt>bool(rhs)</tt> remains unchanged. See Table
+<blockquote>
+<table border="1">
+<caption><ins>Table &mdash; <tt>variant operator=(const std::variant&lt;U&gt;&amp;)</tt> effects</ins></caption>
+<tr>
+<th></th>
+<th><ins><tt>*this</tt> contains a value</ins></th>
+<th><ins><tt>*this</tt> does not contain a value</ins></th>
+</tr>
+<tr>
+<td><ins><tt>rhs</tt> contains a value</ins></td>
+<td><ins>assigns <tt> std​::​move(*rhs)</tt> to the contained value</ins></td>
+<td><ins>initializes the contained value with <tt> std​::​move(*rhs)</tt>.
+If <tt>uses-poly-alloc</tt>
+ is <tt>true</tt>, initialization is done by uses-allocator construction 
+with allocator <tt><i>alloc</i></tt>.</ins></td>
+</tr>
+<tr>
+<td><ins><tt>rhs</tt> does not contain a value</ins></td>
+<td><ins>destroys the contained value by calling <tt>val->T::~T()</tt></ins></td>
+<td><ins>no effect</ins></td>
+</tr>
+</table></blockquote>
+<br/><tab/><i>Returns:</i> <tt>*this</tt>.
+<br/><tab/><i>Ensures:</i> <tt>bool(rhs) == bool(*this)</tt>.
+<br/><tab/><i>Remarks:</i> If any exception is thrown, the result of the expression <tt>bool(*this)</tt> remains unchanged.
+If an exception is thrown during the call to <tt>T</tt>'s constructor, no effect. If an exception is thrown during the call
+to <tt>T</tt>'s assignment, the state of <tt>*val</tt>  is determined by the exception safety guarantee of <tt>T</tt>'s assignment.
+<br/><tab/><i>Mandates:</i>
+<br/><tab2/> - <tt>is_­constructible_­v&lt;T, U&gt;</tt> is <tt>true</tt>,
+<br/><tab2/> - <tt>is_assignable&lt;T&amp;, U&gt;</tt> is <tt>true</tt>,
+<br/><tab2/> - <tt>is_­constructible_­v&lt;T, std::variant&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>,
+<br/><tab2/> - <tt>is_­constructible_­v&lt;T, variant&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>,
+<br/><tab2/> - <tt>is_­constructible_­v&lt;T, std::variant&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>,
+<br/><tab2/> - <tt>is_­constructible_­v&lt;T, variant&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>,
+<br/><tab2/> - <tt>is_­constructible_­v&lt;T, const std::variant&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>,
+<br/><tab2/> - <tt>is_­constructible_­v&lt;T, const variant&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>,
+<br/><tab2/> - <tt>is_­constructible_­v&lt;T, const std::variant&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>,
+<br/><tab2/> - <tt>is_­constructible_­v&lt;T, const variant&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>,
+<br/><tab2/> - <tt>is_­convertible_­v&lt;std::variant&lt;U&gt;&amp;, T&gt;</tt> is <tt>false</tt>,
+<br/><tab2/> - <tt>is_­convertible_­v&lt;variant&lt;U&gt;&amp;, T&gt;</tt> is <tt>false</tt>,
+<br/><tab2/> - <tt>is_­convertible_­v&lt;std::variant&lt;U&gt;&amp;&amp;, T&gt;</tt> is <tt>false</tt>,
+<br/><tab2/> - <tt>is_­convertible_­v&lt;variant&lt;U&gt;&amp;&amp;, T&gt;</tt> is <tt>false</tt>,
+<br/><tab2/> - <tt>is_­convertible_­v&lt;const std::variant&lt;U&gt;&amp;, T&gt;</tt> is <tt>false</tt>,
+<br/><tab2/> - <tt>is_­convertible_­v&lt;const variant&lt;U&gt;&amp;, T&gt;</tt> is <tt>false</tt>,
+<br/><tab2/> - <tt>is_­convertible_­v&lt;const std::variant&lt;U&gt;&amp;&amp;, T&gt;</tt> is <tt>false</tt>,
+<br/><tab2/> - <tt>is_­convertible_­v&lt;const variant&lt;U&gt;&amp;&amp;, T&gt;</tt> is <tt>false</tt>,
+<br/><tab2/> - <tt>is_assignable_v&lt;T&amp;, std::variant&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>,
+<br/><tab2/> - <tt>is_assignable_v&lt;T&amp;, variant&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>,
+<br/><tab2/> - <tt>is_assignable_v&lt;T&amp;, std::variant&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>,
+<br/><tab2/> - <tt>is_assignable_v&lt;T&amp;, variant&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>,
+<br/><tab2/> - <tt>is_assignable_v&lt;T&amp;, const std::variant&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>,
+<br/><tab2/> - <tt>is_assignable_v&lt;T&amp;, const variant&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>,
+<br/><tab2/> - <tt>is_assignable_v&lt;T&amp;, const std::variant&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>, and
+<br/><tab2/> - <tt>is_assignable_v&lt;T&amp;, const variant&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>
+
+
+<br/>
+<br/><tt>template&lt;class U&gt; variant&amp; operator=(variant&lt;U&gt;&amp;&amp; rhs);</tt>
+<br/><tab/><i>Effects:</i> See Table
+<blockquote>
+<table border="1">
+<caption><ins>Table &mdash; <tt>variant operator=(variant&lt;U&gt;&amp;&amp;)</tt> effects</ins></caption>
+<tr>
+<th></th>
+<th><ins><tt>*this</tt> contains a value</ins></th>
+<th><ins><tt>*this</tt> does not contain a value</ins></th>
+</tr>
+<tr>
+<td><ins><tt>rhs</tt> contains a value</ins></td>
+<td><ins>assigns <tt>*rhs</tt> to the contained value</ins></td>
+<td><ins>initializes the contained value with <tt>*rhs</tt>.
+If <tt>uses-poly-alloc</tt>
+ is <tt>true</tt>, initialization is done by uses-allocator construction 
+with allocator <tt><i>alloc</i></tt> .</ins></td>
+</tr>
+<tr>
+<td><ins><tt>rhs</tt> does not contain a value</ins></td>
+<td><ins>destroys the contained value by calling <tt>val->T::~T()</tt></ins></td>
+<td><ins>no effect</ins></td>
+</tr>
+</table></blockquote>
+<br/><tab/><i>Returns:</i> <tt>*this</tt>.
+<br/><tab/><i>Ensures:</i> <tt>bool(rhs) == bool(*this)</tt>.
+<br/><tab/><i>Remarks:</i> If any exception is thrown, the result of the expression <tt>bool(*this)</tt> remains unchanged.
+If an exception is thrown during the call to <tt>T</tt>'s move constructor, the state of <tt>*rhs.val</tt> is determined by
+the exception safety guarantee of <tt>T</tt>'s move constructor. If an exception is thrown during the call to <tt>T</tt>'s move assignment,
+the state of <tt>*val</tt> and <tt>*rhs.val</tt> is determined by the exception safety guarantee of <tt>T</tt>'s move assignment.
+<br/><tab/><i>Mandates:</i>
+<br/><tab2/> - <tt>is_same&lt;T,U&gt;</tt> is <tt>false</tt>,
+<br/><tab2/> - <tt>is_­constructible_­v&lt;T, const U&amp;&gt;</tt> is <tt>true</tt>,
+<br/><tab2/> - <tt>is_assignable&lt;T&amp;, const U&amp;&gt;</tt> is <tt>true</tt>,
+<br/><tab2/> - <tt>is_­constructible_­v&lt;T, std::variant&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>,
+<br/><tab2/> - <tt>is_­constructible_­v&lt;T, variant&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>,
+<br/><tab2/> - <tt>is_­constructible_­v&lt;T, std::variant&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>,
+<br/><tab2/> - <tt>is_­constructible_­v&lt;T, variant&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>,
+<br/><tab2/> - <tt>is_­constructible_­v&lt;T, const std::variant&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>,
+<br/><tab2/> - <tt>is_­constructible_­v&lt;T, const variant&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>,
+<br/><tab2/> - <tt>is_­constructible_­v&lt;T, const std::variant&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>,
+<br/><tab2/> - <tt>is_­constructible_­v&lt;T, const variant&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>,
+<br/><tab2/> - <tt>is_­convertible_­v&lt;const U&amp;, T&gt;</tt> is <tt>true</tt>,
+<br/><tab2/> - <tt>is_­convertible_­v&lt;std::variant&lt;U&gt;&amp;, T&gt;</tt> is <tt>false</tt>,
+<br/><tab2/> - <tt>is_­convertible_­v&lt;variant&lt;U&gt;&amp;, T&gt;</tt> is <tt>false</tt>,
+<br/><tab2/> - <tt>is_­convertible_­v&lt;std::variant&lt;U&gt;&amp;&amp;, T&gt;</tt> is <tt>false</tt>,
+<br/><tab2/> - <tt>is_­convertible_­v&lt;variant&lt;U&gt;&amp;&amp;, T&gt;</tt> is <tt>false</tt>,
+<br/><tab2/> - <tt>is_­convertible_­v&lt;const std::variant&lt;U&gt;&amp;, T&gt;</tt> is <tt>false</tt>,
+<br/><tab2/> - <tt>is_­convertible_­v&lt;const variant&lt;U&gt;&amp;, T&gt;</tt> is <tt>false</tt>,
+<br/><tab2/> - <tt>is_­convertible_­v&lt;const std::variant&lt;U&gt;&amp;&amp;, T&gt;</tt> is <tt>false</tt>,
+<br/><tab2/> - <tt>is_­convertible_­v&lt;const variant&lt;U&gt;&amp;&amp;, T&gt;</tt> is <tt>false</tt>,
+<br/><tab2/> - <tt>is_assignable_v&lt;T&amp;, std::variant&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>,
+<br/><tab2/> - <tt>is_assignable_v&lt;T&amp;, variant&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>,
+<br/><tab2/> - <tt>is_assignable_v&lt;T&amp;, std::variant&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>,
+<br/><tab2/> - <tt>is_assignable_v&lt;T&amp;, variant&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>,
+<br/><tab2/> - <tt>is_assignable_v&lt;T&amp;, const std::variant&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>,
+<br/><tab2/> - <tt>is_assignable_v&lt;T&amp;, const variant&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>,
+<br/><tab2/> - <tt>is_assignable_v&lt;T&amp;, const std::variant&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>, and
+<br/><tab2/> - <tt>is_assignable_v&lt;T&amp;, const variant&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>
+
+<br/>
+<br/><tt>template&lt;class U&gt; variant&amp; operator=(std::variant&lt;U&gt;&amp;&amp; rhs);</tt>
+<br/><tab/><i>Effects:</i> See Table
+<blockquote>
+<table border="1">
+<caption><ins>Table &mdash; <tt>variant operator=(std::variant&lt;U&gt;&amp;&amp;)</tt> effects</ins></caption>
+<tr>
+<th></th>
+<th><ins><tt>*this</tt> contains a value</ins></th>
+<th><ins><tt>*this</tt> does not contain a value</ins></th>
+</tr>
+<tr>
+<td><ins><tt>rhs</tt> contains a value</ins></td>
+<td><ins>assigns <tt>*rhs</tt> to the contained value</ins></td>
+<td><ins>initializes the contained value with <tt>*rhs</tt>.
+If <tt>uses-poly-alloc</tt>
+ is <tt>true</tt>, initialization is done by uses-allocator construction 
+with allocator <tt><i>alloc</i></tt> </ins></td>
+</tr>
+<tr>
+<td><ins><tt>rhs</tt> does not contain a value</ins></td>
+<td><ins>destroys the contained value by calling <tt>val->T::~T()</tt></ins></td>
+<td><ins>no effect</ins></td>
+</tr>
+</table></blockquote>
+<br/><tab/><i>Returns:</i> <tt>*this</tt>.
+<br/><tab/><i>Ensures:</i> <tt>bool(rhs) == bool(*this)</tt>.
+<br/><tab/><i>Remarks:</i> If any exception is thrown, the result of the expression <tt>bool(*this)</tt> remains unchanged.
+If an exception is thrown during the call to <tt>T</tt>'s constructor, the state of <tt>*rhs.val</tt> is determined by the exception
+safety guarantee of <tt>T</tt>'s constructor. If an exception is thrown during the call to <tt>T</tt>'s assignment,
+the state of <tt>*val</tt> and <tt>*rhs.val</tt> is determined by the exception safety guarantee of <tt>T</tt>'s assignment.
+<br/><tab/><i>Mandates:</i>
+<br/><tab2/> - <tt>is_­constructible_­v&lt;T, const U&amp;&gt;</tt> is <tt>true</tt>,
+<br/><tab2/> - <tt>is_assignable&lt;T&amp;, const U&amp;&gt;</tt> is <tt>true</tt>,
+<br/><tab2/> - <tt>is_­constructible_­v&lt;T, std::variant&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>,
+<br/><tab2/> - <tt>is_­constructible_­v&lt;T, variant&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>,
+<br/><tab2/> - <tt>is_­constructible_­v&lt;T, std::variant&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>,
+<br/><tab2/> - <tt>is_­constructible_­v&lt;T, variant&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>,
+<br/><tab2/> - <tt>is_­constructible_­v&lt;T, const std::variant&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>,
+<br/><tab2/> - <tt>is_­constructible_­v&lt;T, const variant&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>,
+<br/><tab2/> - <tt>is_­constructible_­v&lt;T, const std::variant&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>,
+<br/><tab2/> - <tt>is_­constructible_­v&lt;T, const variant&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>,
+<br/><tab2/> - <tt>is_­convertible_­v&lt;const U&amp;, T&gt;</tt> is <tt>true</tt>,
+<br/><tab2/> - <tt>is_­convertible_­v&lt;std::variant&lt;U&gt;&amp;, T&gt;</tt> is <tt>false</tt>,
+<br/><tab2/> - <tt>is_­convertible_­v&lt;variant&lt;U&gt;&amp;, T&gt;</tt> is <tt>false</tt>,
+<br/><tab2/> - <tt>is_­convertible_­v&lt;std::variant&lt;U&gt;&amp;&amp;, T&gt;</tt> is <tt>false</tt>,
+<br/><tab2/> - <tt>is_­convertible_­v&lt;variant&lt;U&gt;&amp;&amp;, T&gt;</tt> is <tt>false</tt>,
+<br/><tab2/> - <tt>is_­convertible_­v&lt;const std::variant&lt;U&gt;&amp;, T&gt;</tt> is <tt>false</tt>,
+<br/><tab2/> - <tt>is_­convertible_­v&lt;const variant&lt;U&gt;&amp;, T&gt;</tt> is <tt>false</tt>,
+<br/><tab2/> - <tt>is_­convertible_­v&lt;const std::variant&lt;U&gt;&amp;&amp;, T&gt;</tt> is <tt>false</tt>,
+<br/><tab2/> - <tt>is_­convertible_­v&lt;const variant&lt;U&gt;&amp;&amp;, T&gt;</tt> is <tt>false</tt>,
+<br/><tab2/> - <tt>is_assignable_v&lt;T&amp;, std::variant&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>,
+<br/><tab2/> - <tt>is_assignable_v&lt;T&amp;, variant&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>,
+<br/><tab2/> - <tt>is_assignable_v&lt;T&amp;, std::variant&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>,
+<br/><tab2/> - <tt>is_assignable_v&lt;T&amp;, variant&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>,
+<br/><tab2/> - <tt>is_assignable_v&lt;T&amp;, const std::variant&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>,
+<br/><tab2/> - <tt>is_assignable_v&lt;T&amp;, const variant&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>,
+<br/><tab2/> - <tt>is_assignable_v&lt;T&amp;, const std::variant&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>, and
+<br/><tab2/> - <tt>is_assignable_v&lt;T&amp;, const variant&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>
+
+
+<br/>
+<br/><code>  template&lt;class... Args&gt;> T&amp; emplace(Args&amp;&amp;...);</code>
+<br/><tab/><i>Constraints:</i> <tt>is_­constructible_­v&lt;T, Args&amp;&amp;...&gt; </tt>is true.
+<br/><tab/><i>Effects:</i> Calls <tt>*this = nullopt</tt>. Then initializes the contained value 
+with <tt>std​::​forward&lt;Args&gt;(args)....</tt>. If <tt>uses-poly-alloc</tt>
+ is <tt>true</tt>, initialization is done by uses-allocator construction 
+with allocator <tt><i>alloc</i></tt>.
+<br/><tab/><i>Ensures:</i> <tt>*this</tt> contains a value.
+<br/><tab/><i>Returns:</i> A reference to the new contained value.
+<br/><tab/><i>Throws:</i> Any exception thrown by the selected constructor of <tt>T</tt>.
+<br/><tab/><i>Remarks:</i>  If an exception is thrown during the call to <tt>T</tt>'s constructor,
+<tt>*this</tt> does not contain a value, and the previous <tt>*val</tt> (if any) has been destroyed.
+
+
+<br/>
+<br/><code>    template&lt;class U, class... Args&gt; T&amp; emplace(initializer_list&lt;U&gt;, Args&amp;&amp;...);</code>
+<br/><tab/><i>Constraints:</i> <tt>is_­constructible_­v&lt;T, initializer_­list&lt;U&gt;&amp;, Args&amp;&amp;...&gt; </tt>is true.
+<br/><tab/><i>Effects:</i> Calls <tt>*this = nullopt</tt>. Then initializes the contained value 
+with <tt>il</tt> and <tt> std​::​forward&lt;Args&gt;(args)....</tt>. If <tt>uses-poly-alloc</tt>
+ is <tt>true</tt>, initialization is done by uses-allocator construction 
+with allocator <tt><i>alloc</i></tt>.
+<br/><tab/><i>Ensures:</i> <tt>*this</tt> contains a value.
+<br/><tab/><i>Returns:</i> A reference to the new contained value.
+<br/><tab/><i>Throws:</i> Any exception thrown by the selected constructor of <tt>T</tt>.
+<br/><tab/><i>Remarks:</i>  If an exception is thrown during the call to <tt>T</tt>'s constructor,
+<tt>*this</tt> does not contain a value, and the previous <tt>*val</tt> (if any) has been destroyed.
+</ins></blockquote>
+
+
+<p><h4><ins> Swap [pmrvariant.swap]</ins></h4></p>
+<blockquote><ins>
+
+<br/><tt>void swap(variant&amp; rhs) noexcept(<i>see below</i>);</tt>
+<br/><tab/><i>Constraints:</i> Lvalues of type <tt>T</tt> shall be swappable and <tt>is_­move_­constructible_­v&lt;T&gt;</tt> is <tt>true</tt>.
+<br/><tab/><i>Expects:</i>If <tt>uses-poly-alloc</tt>
+ is <tt>true</tt>, <tt>a.get_allocator() == b.get_allocator()</tt>.
+<br/><tab/><i>Effects:</i> See Table x
+<br/><tab/><i>Throws:</i> Any exceptions thrown by the operations in the relevant part of Table x.
+<br/><tab/><i>Remarks:</i> The expression inside <tt>noexcept</tt> is equivalent to:
+<tt>is_nothrow_move_constructible_v&lt;T&gt; &and;&and; is_nothrow_swappable_v&lt;T&gt;</tt>
+If any exception is thrown, the results of the expressions <tt>bool(*this)</tt> and <tt>bool(rhs)</tt> remain unchanged.
+If an exception is thrown during the call to function <tt>swap</tt>, the state of <tt>*val</tt> and <tt>*rhs.val</tt> is determined
+by the exception safety guarantee of <tt>swap</tt> for lvalues of <tt>T</tt>. If an exception is thrown during the call to
+<tt>T</tt>’s move constructor, the state of tt>*val</tt>  and <tt>*rhs.val</tt> is determined by the exception safety guarantee
+of <tt>T</tt>’s move constructor.
+<blockquote><table border="1">
+<caption><ins>Table x &mdash; <tt>swap(variant&amp;)</tt> effects</ins></caption>
+<tr>
+<th></th>
+<th><ins><tt>*this</tt> contains a value</ins></th>
+<th><ins><tt>*this</tt> does not contain a value</ins></th>
+</tr>
+<tr>
+<td><ins><tt>rhs</tt> contains a value</ins></td>
+<td><ins>calls <tt>swap(*(*this), *rhs)</tt></ins></td>
+<td><ins>initializes the contained value with
+<tt>std​::​move(*rhs)</tt> as the constructor argument, followed by <tt>rhs.val->T​::​~T()</tt>;
+If <tt>uses-poly-alloc</tt>
+ is <tt>true</tt>, initialization is done by uses-allocator construction 
+with allocator <tt><i>alloc</i></tt>.
+Postcondition is that <tt>*this</tt> contains a value and <tt>rhs</tt> does not contain a value</ins></td>
+</tr>
+<tr>
+<td><ins><tt>rhs</tt> does not contain a value</ins></td>
+<td><ins>initializes the contained value with
+<tt>std​::​move(*(*this))</tt> as the constructor argument, followed by <tt>val->T​::​~T()</tt>; 
+If <tt>uses-poly-alloc</tt>
+ is <tt>true</tt>, initialization is done by uses-allocator construction 
+with allocator <tt><i>alloc</i></tt>.
+Postcondition is that <tt>*this</tt> does not contain a value and <tt>rhs</tt> contains a value</ins></tt></ins></td>
+<td><ins>no effect</ins></td>
+</tr>
+</table></blockquote>
+<br/><tab/><i>Throws:</i> Any exceptions thrown by the operations in the relevant part of Table x.
+</ins></blockquote>
+
+
+<p><h4><ins> Observers [pmrvariant.observe]</ins></h4></p>
+<blockquote><ins>
+
+
+<br/><tt>const T* operator-&gt;() const;</tt>
+<br/><tt>T* operator-&gt;();</tt>
+<br/><tab/><i>Expects:</i> <tt>*this</tt> contains a value.
+<br/><tab/><i>Returns:</i> <tt>val</tt>.
+<br/><tab/><i>Throws:</i> Nothing.
+
+<br/>
+<br/><tt>const T&amp; operator*() const&amp;;</tt>
+<br/><tt>T&amp; operator*() &amp;;();</tt>
+<br/><tab/><i>Expects:</i> <tt>*this</tt> contains a value.
+<br/><tab/><i>Returns:</i> <tt>*val</tt>.
+<br/><tab/><i>Throws:</i> Nothing.
+
+<br/>
+<br/><tt>T&amp;&amp; operator*() &amp;&amp;;</tt>
+<br/><tt>const T&amp;&amp; operator*() const&amp;&amp;; &amp;;();</tt>
+<br/><tab/><i>Expects:</i> <tt>*this</tt> contains a value.
+<br/><tab/><i>Effects:</i> Equivalent to:<tt> return std​::​move(*val);</tt>
+
+
+<br/>
+<br/><tt>explicit operator bool() const noexcept;</tt>
+<br/><tab/><i>Returns:</i> <tt>true</tt> if and only if <tt*this></tt> contains a value.
+
+<br/>
+<br/><tt>bool has_value() const noexcept;</tt>
+<br/><tab/><i>Returns:</i> <tt>true</tt> if and only if <tt*this></tt> contains a value.
+
+<br/>
+<br/><tt>const T&amp; value() const&amp;;</tt>
+<br/><tt>T&amp; value() &amp;;</tt>
+<br/><tab/><i>Effects:</i> Equivalent to:
+<br/><tab2/><tt>return bool(*this) ? *val : throw bad_variant_access();</tt>
+
+<br/>
+<br/><tt>T&amp;&amp; value() &amp;&amp;;</tt>
+<br/><tt> const T&amp;&amp; value() const&amp;&amp;;</tt>
+<br/><tab/><i>Effects:</i> Equivalent to:
+<br/><tab2/><tt>return bool(*this) ? std::move(*val) : throw bad_variant_access();</tt>
+
+<br/>
+<br/><tt>template&lt;class U&gt; T value_or(U&amp;&amp; v) const&amp;;</tt>
+<br/><tab/><i>Effects:</i> Equivalent to:
+<br/><tab2/><tt>return bool(*this) ? **this : static_cast&lt;T&gt;(std::forward&lt;U&gt;(v));</tt>
+<br/><tab/><i>Remarks:</i> If <tt>is_­copy_­constructible_­v&lt;T&gt;
+&& is_­convertible_­v&lt;U&amp;&amp;, T&gt;</tt> is <tt>false</tt>,
+the program is ill-formed.
+
+<br/>
+<br/><tt>template&lt;class U&gt; T value_or(U&amp;&amp; v) &amp;&amp;;</tt>
+<br/><tab/><i>Effects:</i> Equivalent to:
+<br/><tab2/><tt>return bool(*this) ? std::move(**this) : static_cast&lt;T&gt;(std::forward&lt;U&gt;(v));</tt>
+<br/><tab/><i>Remarks:</i> If <tt>is_­move_­constructible_­v&lt;T&gt;
+&& is_­convertible_­v&lt;U&amp;&amp;, T&gt;</tt> is <tt>false</tt>,
+the program is ill-formed.
+
+
+<br/>
+<br/><tt>    template&lt;class U&gt; T value_or(allocator_arg_t, const polymorphic_allocator&lt;&gt;&amp; a, U&amp;&amp; v) const&amp;;</tt>tt>
+<br/><tab/><i>Constraints:</i> <tt>uses_allocator&lt;T,polymorphic_allocator&lt;&gt;&gt;</tt> is true;
+<br/><tab/><i>Effects:</i> if <tt>*this</tt> contains a value, returns an object of type <tt>T</tt> initialized by
+uses-allocator construction with allocator <tt>a</tt> and <tt>**this</tt> as the constructor argument.
+Otherwise, returns an object of type <tt>T</tt> initialized by
+uses-allocator construction with allocator <tt>a</tt> and <tt>std::forward&lt;U&gt;(v)</tt> as the constructor argument.
+<br/><tab/><i>Remarks:</i> If <tt>is_­copy_­constructible_­v&lt;T&gt;
+&& is_­convertible_­v&lt;U&amp;&amp;, T&gt;</tt> is <tt>false</tt>,
+the program is ill-formed.
+
+<br/>
+<br/><tt>    template&lt;class U&gt; T value_or(allocator_arg_t, const polymorphic_allocator&lt;&gt;&amp; a, U&amp;&amp; v) &amp;&amp;;</tt>
+<br/><tab/><i>Constraints:</i> <tt>uses_allocator&lt;T,polymorphic_allocator&lt;&gt;&gt;</tt> is true;
+<br/><tab/><i>Effects:</i> if <tt>*this</tt> contains a value, returns an object of type <tt>T</tt> initialized by
+uses-allocator construction with allocator <tt>a</tt> and <tt>std::move(**this)</tt> as the constructor argument.
+Otherwise, returns an object of type <tt>T</tt> initialized by
+uses-allocator construction with allocator <tt>a</tt> and <tt>std::forward&lt;U&gt;(v)</tt> as the constructor argument.
+<br/><tab/><i>Remarks:</i> If <tt>is_­copy_­constructible_­v&lt;T&gt;
+&& is_­convertible_­v&lt;U&amp;&amp;, T&gt;</tt> is <tt>false</tt>,
+the program is ill-formed.
+
+<br/>
+<br/><tt>allocator_type get_allocator() const noexcept;</tt>
+<br/><tab/><i>Constraints:</i> <tt>uses_allocator&lt;T,polymorphic_allocator&lt;&gt;&gt;</tt> is true;
+<br/><tab/><i>Returns:</i> <tt><i>alloc</i></tt>.
+<br/><tab/><i>Throws:</i> nothing.
+
+
+</ins></blockquote>
+
+
+<p><h4><ins> Modifiers [pmrvariant.mod]</ins></h4></p>
+<blockquote><ins>
+
+<br/><tt>void reset() noexcept;</tt>
+<br/><tab/><i>Effects:</i> If <tt>*this</tt> contains a value, calls <tt>val->T​::​~T()</tt> to destroy the contained value; otherwise no effect.
+<br/><tab/><i>Ensures:</i> <tt>*this</tt> does not contain a value.
+
+</ins></blockquote>
+<p><h4><ins> Allocator-related traits [pmrvariant.traits]</ins></h4></p>
+<blockquote><ins>
+<br/><tt>    template&ltclass T&gt;</tt>
+<br/><tt>   struct uses_allocator&ltT, polymorphic_allocator&lt;&gt;&gt; : 
+<br/><tab/><tt>   uses_allocator&ltT,  polymorphic_allocator&lt;&gt;&gt; { };</tt>
+
+</ins></blockquote>
+
+<p><h3><ins> Relational operators [pmrvariant.relops]</ins></h3></p>
+<blockquote><ins>
+<tt>
+<br/><tab/>   template&lt;class T, class U&gt; bool operator==(const variant&lt;T&gt;&amp;, const variant&lt;U&gt;&amp;);
+<br/><tab/>   template&lt;class T, class U&gt; bool operator==(const variant&lt;T&gt;&amp;, const std::variant&lt;U&gt;&amp;);
+<br/><tab/>   template&lt;class T, class U&gt; bool operator==(const std::variant&lt;T&gt;&amp;, const variant&lt;U&gt;&amp;);
+</tt>
+<br/><tab/><i>Mandates:</i> The expression <tt>*x == *y</tt> shall be well-formed and its result shall be convertible to 
+<tt>bool</tt>. [ <i>Note:</i> <tt>T</tt> need not be <tt>Cpp17EqualityComparable</tt>. — <i>end note</i> ]
+<br/><tab/><i>Returns:</i> If <tt>bool(x) != bool(y)</tt>, <tt>false</tt>; otherwise if <tt>bool(x) == false</tt>, <tt>true</tt>; otherwise <tt>*x == *y</tt>.
+
+
+<br/>
+<tt>
+<br/><tab/>   template&lt;class T, class U&gt; bool operator!=(const variant&lt;T&gt;&amp;, const variant&lt;U&gt;&amp;);
+<br/><tab/>   template&lt;class T, class U&gt;bool operator!=(const variant&lt;T&gt;&amp;, const std::variant&lt;U&gt;&amp;);
+<br/><tab/>   template&lt;class T, class U&gt; bool operator!=(const std::variant&lt;T&gt;&amp;, const variant&lt;U&gt;&amp;);
+</tt>
+<br/><tab/><i>Mandates:</i> The expression <tt>*x != *y</tt> shall be well-formed and its result shall be convertible to 
+<tt>bool</tt>. 
+<br/><tab/><i>Returns:</i> If <tt>bool(x) != bool(y)</tt>, <tt>true</tt>; otherwise if <tt>bool(x) == false</tt>, <tt>false</tt>; 
+otherwise <tt>*x != *y</tt>.
+
+<br/>
+<tt>
+<br/><tab/>   template&lt;class T, class U&gt; bool operator&lt;(const variant&lt;T&gt;&amp;, const variant&lt;U&gt;&amp;);
+<br/><tab/>   template&lt;class T, class U&gt; bool operator&lt;(const variant&lt;T&gt;&amp;, const std::variant&lt;U&gt;&amp;);
+<br/><tab/>   template&lt;class T, class U&gt; bool operator&lt;(const std::variant&lt;T&gt;&amp;, const variant&lt;U&gt;&amp;);
+</tt>
+<br/><tab/><i>Mandates:</i> The expression <tt>*x &lt; *y</tt> shall be well-formed and its result shall be convertible to 
+<tt>bool</tt>. 
+<br/><tab/><i>Returns:</i> If <tt>!y</tt>, <tt>false</tt>; otherwise if <tt>!x</tt>, <tt>true</tt>; 
+otherwise <tt>*x &lt; *y</tt>.
+
+
+
+<br/>
+<tt>
+<br/><tab/>   template&lt;class T, class U&gt; bool operator&gt;(const variant&lt;T&gt;&amp;, const variant&lt;U&gt;&amp;);
+<br/><tab/>   template&lt;class T, class U&gt; bool operator&gt;(const variant&lt;T&gt;&amp;, const std::variant&lt;U&gt;&amp;);
+<br/><tab/>   template&lt;class T, class U&gt; bool operator&gt;(const std::variant&lt;T&gt;&amp;, const variant&lt;U&gt;&amp;);
+</tt>
+<br/><tab/><i>Mandates:</i> The expression <tt>*x &gt; *y</tt> shall be well-formed and its result shall be convertible to 
+<tt>bool</tt>. 
+<br/><tab/><i>Returns:</i> If <tt>!x</tt>, <tt>false</tt>; otherwise if <tt>!y</tt>, <tt>true</tt>; 
+otherwise <tt>*x &gt; *y</tt>.
+
+
+<br/>
+<tt>
+<br/><tab/>   template&lt;class T, class U&gt; bool operator&lt;=(const variant&lt;T&gt;&amp;, const variant&lt;U&gt;&amp;);
+<br/><tab/>   template&lt;class T, class U&gt; bool operator&lt;=(const variant&lt;T&gt;&amp;, const std::variant&lt;U&gt;&amp;);
+<br/><tab/>   template&lt;class T, class U&gt; bool operator&lt;=(const std::variant&lt;T&gt;&amp;, const variant&lt;U&gt;&amp;);
+</tt>
+<br/><tab/><i>Mandates:</i> The expression <tt>*x &lt;= *y</tt> shall be well-formed and its result shall be convertible to 
+<tt>bool</tt>. 
+<br/><tab/><i>Returns:</i> If <tt>!x</tt>, <tt>true</tt>; otherwise if <tt>!y</tt>, <tt>false</tt>; 
+otherwise <tt>*x &lt;= *y</tt>.
+
+
+<br/>
+<tt>
+<br/><tab/>   template&lt;class T, class U&gt; bool operator&t;=(const variant&lt;T&gt;&amp;, const variant&lt;U&gt;&amp;);
+<br/><tab/>   template&lt;class T, class U&gt; bool operator&gt;=(const variant&lt;T&gt;&amp;, const std::variant&lt;U&gt;&amp;);
+<br/><tab/>   template&lt;class T, class U&gt; bool operator&gt;=(const std::variant&lt;T&gt;&amp;, const variant&lt;U&gt;&amp;);
+</tt>
+<br/><tab/><i>Mandates:</i> The expression <tt>*x &gt;= *y</tt> shall be well-formed and its result shall be convertible to 
+<tt>bool</tt>. 
+<br/><tab/><i>Returns:</i> If <tt>!y</tt>, <tt>true</tt>; otherwise if <tt>!x</tt>, <tt>false</tt>; 
+otherwise <tt>*x &gt;= *y</tt>.
+
+
+<br/>
+<tt>
+<br/><tab/>   template&lt;class T, three_way_comparable_with&lt;T&gt; U&gt;
+<br/><tab2/>	compare_three_way_result_t&lt;T,U&gt;
+<br/><tab/><tab2/>      operator&lt;=&gt;(const variant&lt;T&gt;&amp;, const variant&lt;U&gt;&amp;);
+<br/><tab/>   template&lt;class T, three_way_comparable_with&lt;T&gt; U&gt;
+<br/><tab2/>	compare_three_way_result_t&lt;T,U&gt;
+<br/><tab/><tab2/>      operator&lt;=&gt;(const variant&lt;T&gt;&amp;, const std::variant&lt;U&gt;&amp;);
+<br/><tab/>   template&lt;class T, three_way_comparable_with&lt;T&gt; U&gt;
+<br/><tab2/>	compare_three_way_result_t&lt;T,U&gt;
+<br/><tab/><tab2/>      operator&lt;=&gt;(const std::variant&lt;T&gt;&amp;, const variant&lt;U&gt;&amp;);
+</tt>
+<br/><tab/><i>Returns:</i> If <tt>x &amp;&amp; y</tt>, <tt>*x &lt;=&gt; *y</tt>; otherwise <tt>bool(x) &lt;=&gt; bool(y)</tt>.
+</ins></blockquote>
+
+<p><h3><ins> Comparison with nullopt [pmrvariant.nullops]</ins></h3></p>
+<blockquote><ins>
+<br/><tab/><tt>   template&lt;class T&gt; bool operator==(const variant&lt;T&gt;&amp;, nullopt_t) noexcept;</tt>
+<br/><tab/><i>Returns:</i> <tt>!x</tt>.
+
+<br/>
+<br/><tab/><tt>   template&lt;class T&gt; strong_ordering operator&lt;=&gt;(const variant&lt;T&gt;&amp;, nullopt_t) noexcept;</tt>
+<br/><tab/><i>Returns:</i> <tt>bool(x) &lt;=&gt; false</tt>.
+</ins></blockquote>
+
+
+<p><h3><ins> Comparison with <tt>T</tt> [pmrvariant.comp.with.t]</ins></h3></p>
+<blockquote><ins>
+
+<br/><tab/><tt>    template&lt;class T, class U&gt; bool operator==(const variant&lt;T&gt;&amp; x, const U&amp; v);</tt>
+<br/><tab/><i>Mandates:</i> The expression <tt>*x == v</tt> shall be well-formed and its result shall be convertible to <tt>bool</tt>.
+[ <tt>Note:</tt> <tt>T</tt> need not be <tt>Cpp17EqualityComparable</tt>. — <tt>end note </tt>]
+<br/><tab/><i>Effects: </i> Equivalent to: <tt>return bool(x) ? *x == v : false;</tt>
+
+
+<br/>
+<br/><tab/><tt>    template&lt;class T, class U&gt; bool operator==(const T&amp; t, const variant&lt;U&gt;&amp; v);</tt>
+<br/><tab/><i>Mandates:</i> The expression <tt>x == *v</tt> shall be well-formed and its result shall be convertible to <tt>bool</tt>. 
+<br/><tab/><i>Effects: </i> Equivalent to: <tt>return bool(v) ? x == *v : false;</tt>
+
+<br/>
+<br/><tab/><tt>    template&lt;class T, class U&gt; bool operator!=(const variant&lt;T&gt;&amp; u, const U&amp; v);</tt>
+<br/><tab/><i>Mandates:</i> The expression <tt>*x != v</tt> shall be well-formed and its result shall be convertible to <tt>bool</tt>.
+<br/><tab/><i>Effects: </i> Equivalent to: <tt>return bool(x) ? *x != v : true;</tt>
+
+<br/>
+<br/><tab/><tt>    template&lt;class T, class U&gt; bool operator!=(const T&amp; t, const variant&lt;U&gt;&amp; v);</tt>
+<br/><tab/><i>Mandates:</i> The expression <tt>x != *v</tt> shall be well-formed and its result shall be convertible to <tt>bool</tt>.
+<br/><tab/><i>Effects: </i> Equivalent to: <tt>return bool(v) ? x != *v : true;</tt>
+
+
+<br/>
+<br/><tab/><tt>    template&lt;class T, class U&gt; bool operator&lt;(const variant&lt;T&gt;&amp;, const U&amp;);</tt>
+<br/><tab/><i>Mandates:</i> The expression <tt>*x &lt; v</tt> shall be well-formed and its result shall be convertible to <tt>bool</tt>.
+<br/><tab/><i>Effects: </i> Equivalent to: <tt>return bool(x) ? *x &lt; v : true;</tt>
+
+
+<br/>
+<br/><tab/><tt>    template&lt;class T, class U&gt; bool operator&lt;(const T&amp; t, const variant&lt;U&gt;&amp; v);</tt>
+<br/><tab/><i>Mandates:</i> The expression <tt>x &lt; *v</tt> shall be well-formed and its result shall be convertible to <tt>bool</tt>.
+<br/><tab/><i>Effects: </i> Equivalent to: <tt>return bool(v) ? x &lt; *v : false;</tt>
+
+
+<br/>
+<br/><tab/><tt>    template&lt;class T, class U&gt; bool operator&gt;(const variant&lt;T&gt;&amp;, const U&amp;);</tt>
+<br/><tab/><i>Mandates:</i> The expression <tt>*x &gt; v</tt> shall be well-formed and its result shall be convertible to <tt>bool</tt>.
+<br/><tab/><i>Effects: </i> Equivalent to: <tt>return bool(x) ? *x &gt; v : false;</tt>
+
+
+<br/>
+<br/><tab/><tt>    template&lt;class T, class U&gt; bool operator&gt;(const T&amp; t, const variant&lt;U&gt;&amp; v);</tt>
+<br/><tab/><i>Mandates:</i> The expression <tt>x &gt; *v</tt> shall be well-formed and its result shall be convertible to <tt>bool</tt>.
+<br/><tab/><i>Effects: </i> Equivalent to: <tt>return bool(v) ? x &gt; *v : true;</tt>
+
+
+<br/>
+<br/><tab/><tt>    template&lt;class T, class U&gt; bool operator&lt;=(const variant&lt;T&gt;&amp;, const U&amp;);</tt>
+<br/><tab/><i>Mandates:</i> The expression <tt>*x &lt;= v</tt> shall be well-formed and its result shall be convertible to <tt>bool</tt>.
+<br/><tab/><i>Effects: </i> Equivalent to: <tt>return bool(x) ? *x &lt;= v : true;</tt>
+
+
+<br/>
+<br/><tab/><tt>    template&lt;class T, class U&gt; bool operator&lt;=(const T&amp; t, const variant&lt;U&gt;&amp; v);</tt>
+<br/><tab/><i>Mandates:</i> The expression <tt>x &lt;= *v</tt> shall be well-formed and its result shall be convertible to <tt>bool</tt>.
+<br/><tab/><i>Effects: </i> Equivalent to: <tt>return bool(v) ? x &lt;= *v : false;</tt>
+
+
+<br/>
+<br/><tab/><tt>    template&lt;class T, class U&gt; bool operator&gt;=(const variant&lt;T&gt;&amp;, const U&amp;);</tt>
+<br/><tab/><i>Mandates:</i> The expression <tt>*x &gt;= v</tt> shall be well-formed and its result shall be convertible to <tt>bool</tt>.
+<br/><tab/><i>Effects: </i> Equivalent to: <tt>return bool(x) ? *x &gt;= v : false;</tt>
+
+
+<br/>
+<br/><tab/> <tt>   template&lt;class T, class U&gt; bool operator&gt;=(const T&amp; t, const variant&lt;U&gt;&amp; v);</tt>
+<br/><tab/><i>Mandates:</i> The expression <tt>x &gt;= *v</tt> shall be well-formed and its result shall be convertible to <tt>bool</tt>.
+<br/><tab/><i>Effects: </i> Equivalent to: <tt>return bool(v) ? x &gt;= *v : true;</tt>
+
+
+<br/>
+<br/><tab/><tt>    template&lt;class T, three_way_comparable_with&lt;T&gt; U&gt;
+<br/><tab2/>	compare_three_way_result_t&lt;T,U&gt;
+<br/><tab/><tab2/>      operator&lt;=&gt;(const variant&lt;T&gt;&amp; x, const U&amp;v);</tt>
+<br/><tab/><i>Effects: </i> Equivalent to: <tt>return bool(x) ? *x &gt;=&lt; v : strong_­ordering​::​less ;</tt>
+
+</ins></blockquote>
+
+<p><h3><ins>  Specialized algorithms [pmrvariant.specalg]</ins></h3></p>
+<blockquote><ins>
+
+<br/><tab/><tt>   template&lt;class T&gt; void swap(variant&lt;T&gt;&amp; x, variant&lt;T&gt;&amp; y)</tt>
+<br/><tab/><i>Effects: </i> if <tt>x.get_allocator() == y.get_allocator()</tt>, calls <tt> x.swap(y)</tt>. Otherwise equvivalent to
+<tt>
+<br/><tab2/>std::pmr::variant futureX(allocator_arg_t,x.get_allocator(),y);
+<br/><tab2/>std::pmr::variant futureY(allocator_arg_t,y.get_allocator(),x);
+<br/><tab2/>futureX.swap(x);
+<br/><tab2/>futureY.swap(y);
+
+</tt>
+
+
+<br/>
+<br/><tab/><tt>   template&lt;class T&gt; constexpr variant&lt;decay_­t&lt;T&gt;&gt; make_variant(T&amp;&amp;);</tt>
+<br/><tab/><i>Returns: </i> <tt>variant&lt;decay_­t&lt;T&gt;&gt;(std​::​forward&lt;T&gt;(v)).</tt>
+<br/><tab/><i>Remarks: </i> Specialization of this function template shall be a constexpr function if  
+<tt>uses-poly-alloc::value</tt> is <tt>false</tt>. 
+
+<br/>
+<br/><tab/><tt>   template&lt;class T&gt; constexpr variant&lt;T&gt; make_variant();</tt>
+<br/><tab/><i>Effects: </i> Equivalent to: <tt> return variant&lt;T&gt(in_­place).</tt>
+<br/><tab/><i>Remarks: </i> Specialization of this function template shall be a constexpr function if  
+<tt>uses-poly-alloc::value</tt> is <tt>false</tt>.
+
+<br/>
+<br/><tab/><tt>   template&lt;class T, class Arg0, class... Args&gt constexpr 
+                    variant&lt;T&gt; make_variant(Arg0&amp;&amp; arg0, Args&amp;&amp;... args);</tt>
+<br/><tab/><i>Effects: </i> Equivalent to: <tt> return variant&lt;T&gt(in_­place, std​::​forward&lt;Arg0&gt;(arg0), std​::​forward&lt;Args&gt;(args)...).</tt>
+<br/><tab/><i>Constraints: </i><tt> !is_same&lt; typename remove_cvref_t&lt;ARG0&gt;, allocator_arg_t&gt;</tt>
+<br/><tab/><i>Remarks: </i> Specialization of this function template shall be a constexpr function if  
+<tt>uses-poly-alloc::value</tt> is <tt>false</tt>.
+
+<br/>
+<br/><tab/><tt>   template&lt;class T, class... Args&gt constexpr variant&lt;T&gt; make_variant(Args&amp;&amp;... args);</tt>
+<br/><tab/><i>Effects: </i> Equivalent to: <tt> return variant&lt;T&gt(in_­place, std​::​forward&lt;Args&gt;(args)...).</tt>
+<br/><tab/><i>Remarks: </i> Specialization of this function template shall be a constexpr function if  
+<tt>uses-poly-alloc::value</tt> is <tt>false</tt>.
+
+<br/>
+<br/><tab/><tt>   template&lt;class T, class U, class... Args> variant&lt;T&gt; </tt>
+<br/><tab2/><tt>  constexpr make_variant(initializer_list&lt;U&gt; il, Args&amp;&amp;... args);</tt>
+<br/><tab/><i>Effects: </i> Equivalent to: <tt> return variant&lt;T&gt(in_­place, il, std​::​forward&lt;Args&gt;(args)...).</tt>
+<br/><tab/><i>Remarks: </i> Specialization of this function template shall be a constexpr function if  
+<tt>uses-poly-alloc::value</tt> is <tt>false</tt>.
+
+<br/>
+<br/><tab/><tt>  template&lt;class T, variant&lt;decay_­t&lt;T&gt;&gt; </tt>
+<br/><tab2/><tt>  make_variant(allocator_arg_t, const polymorphic_allocator&lt;&gt;&amp; a, T&amp;&amp;);</tt>
+<br/><tab/><i>Mandates:</i> <tt>uses_allocator&lt;T,polymorphic_allocator&lt;&gt;&gt;</tt> is true;
+<br/><tab/><i>Returns: </i> <tt>variant&lt;decay_­t&lt;T&gt;&gt;(allocator_arg, a, in_place, std​::​forward&lt;T&gt;(v)).</tt>
+
+<br/>
+<br/><tab/><tt>   template&lt;class T, class... Args> variant&lt;T&gt; </tt>
+<br/><tab2/><tt>  make_variant(allocator_arg_t, const polymorphic_allocator&lt;&gt;&amp; a, Args&amp;&amp;... args);</tt>
+<br/><tab/><i>Mandates:</i> <tt>uses_allocator&lt;T,polymorphic_allocator&lt;&gt;&gt;</tt> is true;
+<br/><tab/><i>Effects: </i> Equivalent to: <tt> return variant&lt;T&gt(allocator_arg, a, in_place, std​::​forward&lt;Args&gt;(args)...).</tt>
+
+<br/>
+<br/><tab/><tt>   template&lt;class T, class U, class... Args> variant&lt;T&gt;</tt>
+<br/><tab2/><tt>  make_variant(allocator_arg_t, const polymorphic_allocator&lt;&gt;&amp; a, initializer_list&lt;U&gt; il, Args&amp;&amp;... args);</tt>
+<br/><tab/><i>Mandates:</i> <tt>uses_allocator&lt;T,polymorphic_allocator&lt;&gt;&gt;</tt> is true;
+<br/><tab/><i>Effects: </i> Equivalent to: <tt> return variant&lt;T&gt(allocator_arg, a, in_place, il, std​::​forward&lt;Args&gt;(args)...).</tt>
+
+</ins></blockquote>
+
+<p><h3><ins>  Hash support [pmrvariant.hash]</ins></h3></p>
+<blockquote><ins>
+<br/><tab/><tt>   template&lt;class T&gt; struct hash&lt;variant&lt;T&gt;&gt;;</tt>
+<br/><tab/> The specialization <tt>hash&lt;variant&lt;T&gt;&gt;</tt> is enabled ([unord.hash]) if and only if 
+<tt>hash&lt;remove_­const_­t&lt;T&gt;&gt;</tt> is enabled. When enabled, for an object <tt>o</tt> of type <tt>variant&lt;T&gt;</tt>, 
+if <tt>bool(o) == true</tt>, then <tt>hash&lt;variant&lt;T&gt;&gt;()(o)</tt> shall evaluate to the 
+same value as <tt>hash&lt;remove_­const_­t&lt;T&gt;&gt;()(*o)</tt>; otherwise it evaluates to an unspecified value. 
+The member functions are not guaranteed to be <tt>noexcept</tt>.
+</ins></blockquote>
+
+</body>
+</html> 
