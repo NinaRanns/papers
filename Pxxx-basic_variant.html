@@ -113,30 +113,67 @@ Audience: LEWG
 <h2>Design decisions:</h2>
 
 <p>
-  The basic design of an AA variant is straight-forward: Add an allocator to
-  all of its constructors and use that allocator to construct the value object
-  each type the variant is engaged.  However, we posit that when all alternatives
-  are of non-AA type, there is no reason to pay the overhead of storing an 
-  allocator, nor to support the AA constructor interface. For this
-  reason, <tt>std::basic_variant</tt> has a different specialisation for AA and
-  non-AAtype. 
- </p>
+  Because <tt>basic_variant</tt> takes variadic number of alternative types,
+  the type of the allocator has to be specified first, right after the
+  <tt>allocator_arg_t</tt> non-type template argument. The specified allocator
+  type will be used to determine whether an alternative is constructed using
+  an allocator or not, as determined by <tt>uses-allocator</tt> construction.
+</p>  
+<p>
+   <tt>basic_variant</tt> provides allocator extended constructors to allow
+   the used to explicitly provide a desired allocator object. If an 
+   allocator object is not
+   provided, it is created by default in all cases except
+   move construction from a <tt>basic_variant</tt> of same type. 
+</p>
+<p>
+  When doing move construction  rom <tt>basic_variant</tt> of same type, 
+  <tt>allocator_traits</tt> of the 
+  allocator type will be used to determine the resulting allocator.
+  Similarly, <tt>allocator_traits</tt> are used when doing copy/move assignment 
+  and swap. 
+</p>
+<p>
+  When changing the alternative type, the stored allocator object is used to 
+  construct the new alternative type object. Every alternative type object
+  contained in <tt>basic_variant</tt> is constructed with 
+  <tt>uses-allocator</tt> construction, the constructors of the 
+  alternative type are never invoked directly.
+</p>
 <p>   
   The free swap function has been made to have a wide contract and work with 
   different allocators, as discussed in P0178 
   (http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2016/p0178r0.html)
 </p>
-<p> For design simplicity reasons, the paper does not propose 
+<p> For design simplicity reasons, the paper proposes 
 <tt>std::basic_variant</tt> to be a completely separate type to<tt>std::variant</tt>.
 Conversions between the two types are not considered at this point in time. 
 </p>
+<h2>Feedback items for LEWG</h2>
+<p><h3>Should assignment deffer to direct type assignment ?</h3></p>
+<p>
+When using allocator types that propagate on copy/move assignment, should
+<tt>basic_variant</tt> defer to direct type assignment or manage the resulting
+object allocator itself, according to the allocator propagation traits.
+Deferring to the type can cause the allocator object in <tt>basic_variant</tt>
+to become out of sync with the alternative object for move asssignment case 
+when POCCA and POCMA differ, and the type does not support move assignment. 
 
+
+</p>
 
 <h2>Proposed wording</h2>
 <p>
-Add new paragraphs after 20.6.1/p1 [variant.general]
+Add new section after 22.6 [variant]
 </p>
-
+<ins>
+22.X Basic_variant                                                [basicvariant]
+<br/> 22.X.X. In general                                  [basicvariant.general]
+A <tt>basic_variant</tt> object holds and manages the lifetime of a value. 
+If the <tt>basic_variant</tt> holds a value, that value’s
+type has to be one of the template argument types given to <tt>basic_variant</tt>. 
+These template arguments are called alternatives. Each <tt>basic_variant</tt>
+has an allocator type <tt>Alloc</tt> ????
 
 </ins></blockquote>
 
