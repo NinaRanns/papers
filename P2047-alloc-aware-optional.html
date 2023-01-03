@@ -99,6 +99,7 @@ do any allocation, and that the name is not appropriate
 <br/>R5:
 <br/> - various clean up of proposed wording
 <br/> - setting the default allocator to be <tt>remove_cv_t</tt> version of value_type
+<br/> - removed make facilities
 
 
  
@@ -185,7 +186,14 @@ and using the nested <tt>type</tt> of the <tt>std::conditional</tt> as the funct
 <p>The free swap function has been made to have a wide contract and work with different allocators, as discussed in 
 P0178 (http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2016/p0178r0.html)
 </p>
-
+<p>
+Make facilities have been deemed unnecessary with the availability of CTAD. The current
+version of the paper doesn't propose <tt>std::make_basic_optional</tt> nor <tt>std::pmr::make_optional</tt>.
+Previous version suggested those be included, but with implementation experience, we found
+a complexity in allowing the allocator type to be both specifiable and defaulted in non
+allocator extended version of the make facility. We deem such complexity unnecessary 
+with the advent of the CTAD feature.
+</p>
 
 <h2>Feedback items for LEWG: </h2>
 
