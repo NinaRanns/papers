@@ -32,7 +32,7 @@ Audience: LEWG
 <a href="mailto:ville.voutilainen@gmail.com">Ville Voutilainen</a><br/>
 <a href="mailto:dinka.ranns@gmail.com">Nina Dinka Ranns</a><br/>
 <a href="mailto:phalpern@halpernwightsoftware.com">Pablo Halpern</a><br/>
-2022-12-09<br/>
+2023-01-04<br/>
 </address>
 <hr/>
 <h1 align=center>An allocator-aware optional type</h1>
@@ -146,6 +146,26 @@ do any allocation, and that the name is not appropriate
 
 <h2>Design decisions:</h2>
 
+<p><h3><tt>basic_optional</tt> supports non-scoped propagating allocators </h3></p>
+<p>
+  There are two ways of viewing <tt>basic_optional&lt;T&gt;</tt>  from allocator propagation perspective :
+<br/> #1 <tt>basic_optional&lt;T&gt;</tt> is like a <tt>std::tuple</tt>, i.e. it only accepts
+      the allocator at construction so it can forward it to the value_type object. One can 
+      use a non-scoped propagation allocator, and when using a scoped propagation allocator
+      <tt>basic_optional&lt;T&gt;</tt> will not "consume" an allocator level. An optional 
+      object is in a way like a tuple object as it does not use the allocator itself, 
+      it only passes it into the value_type object.
+<br/> #2 <tt>basic_optional&lt;T&gt;</tt> is like a <tt>std::vector</tt>, i.e. it is a container
+        of one or zero elements, and one should use a scoped propagating allocator if one wants
+        the value_type object to use the allocator. In this approach <tt>basic_optional&lt;T&gt;</tt> will "consume" an allocator level.
+          Using non-scoped propagating allocators 
+        makes little sense in this scenario.
+      </p>
+<p>        
+<p> The proposal implements #1 as <tt>basic_optional</tt> itself does not allocate any
+memory so it makes little sense for it to consume an alloctor level.
+</p>
+
 <p>
   The basic design of an AA optional is straight-forward: Add an allocator to
   all of its constructors and use that allocator to construct the value object
@@ -162,78 +182,7 @@ do any allocation, and that the name is not appropriate
   
 </p>
 
-
-<p>
-	An early draft of this proposal suggested using a type alias where a non-AA <tt>basic_optional</tt>
-	aliases <tt>std::optional</tt>, and AA <tt>basic_optional</tt> aliases a new unnamed type. 
-  However, this causes usability issues. Type deduction in cases like :
-<br/><tt>
-<br/><tab2/>template &lt;typename T&gt;
-<br/><tab2/>void foo(basic_optional&lt;T&gt;);
-<br/></tt>
-
-<br/>did not work. The above was equivalent to 
-
-<br/><tt>
-<br/><tab2/>template &lt;typename T, typename Alloc&gt;
-<br/><tab2/>void foo(std::conditional&lt;std::uses_allocator &lt;T, Alloc&lt;&gt;&gt;::value,
-<br/><tab2/><tab2/><tab2/><tab2/><tab2/><i>__basic_optional</i>&ltT&gt,
-<br/><tab2/><tab2/><tab2/><tab2/><tab2/>std::optional&lt;T&gt;&gt;:type);
-<br/></tt>
-<br/> 
-and using the nested <tt>type</tt> of the <tt>std::conditional</tt> as the function template parameter  made for an undeduced context.
-</p>
-<p>The free swap function has been made to have a wide contract and work with different allocators, as discussed in 
-P0178 (http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2016/p0178r0.html)
-</p>
-<p>
-Make facilities have been deemed unnecessary with the availability of CTAD. The current
-version of the paper doesn't propose <tt>std::make_basic_optional</tt> nor <tt>std::pmr::make_optional</tt>.
-Previous version suggested those be included, but with implementation experience, we found
-a complexity in allowing the allocator type to be both specifiable and defaulted in non
-allocator extended version of the make facility. We deem such complexity unnecessary 
-with the advent of the CTAD feature.
-</p>
-
-<h2>Feedback items for LEWG: </h2>
-
-<p><h3>Do we want to support non-scoped propagating allocators ?</h3></p>
-<p>
-  There are two ways of viewing <tt>basic_optional&lt;T&gt;</tt>  from allocator propagation perspective :
-<br/> #1 <tt>basic_optional&lt;T&gt;</tt> is like a <tt>std::tuple</tt>, i.e. it only accepts
-      the allocator at construction so it can forward it to the value_type object. One can 
-      use a non-scoped propagation allocator, and when using a scoped propagation allocator
-      <tt>basic_optional&lt;T&gt;</tt> will not "consume" an allocator level. An optional 
-      object is in a way like a tuple object as it does not use the allocator itself, 
-      it only passes it into the value_type object.
-<br/> #2 <tt>basic_optional&lt;T&gt;</tt> is like a <tt>std::vector</tt>, i.e. it is a container
-        of one or zero elements, and one should use a scoped propagating allocator if one wants
-        the value_type object to use the allocator. Using non-scoped propagating allocators 
-        makes little sense in this scenario.
-      </p>
-<p>        
-In other words, when using an allocator other than <tt>std::polymorphic_allocator</tt>, 
-should both <tt>tup1</tt> and <tt>tup2</tt> tuples always use the same allocator for the <tt>T</tt> and <tt>U</tt> objects ?
-<br/><tt>  
-<br/><tab2/>    std::tuple&lt;T,U&gt; tup1{allocator_arg_t, alloc};
-<br/><tab2/>    std::tuple&lt;basic_optional&lt;T,Alloc&gt;,basic_optional&lt;U,Alloc&gt;&gt; tup2{allocator_arg_t, alloc}; </tt>
-</p>
-
-<p> The proposal currently implements #1, and the case above results in the same alocator for <tt>T</tt> and <tt>U</tt> objects
-in <tt>tup1</tt> and <tt>tup2</tt>. 
-It's worth nothing that one can use a <tt>std::scoped_allocator_adaptor&lt;Alloc&gt;</tt> with non-scoped 
-propagating allocators to get the desired behaviour should we decide to go for #2. 
-</p>
-<!-- 
-	<h3>Should <tt>std::pmr::optional</tt> be placed in the <tt>&lt;optional&gt;</tt> header?
-</h3>
-	<br/> This proposal puts <tt>std::pmr::optional</tt> in a <tt>optional</tt> header. Historically, pmr containers didn't have their own header files.
-	However, <tt>std::pmr::optional</tt> is a more complex type than, for example, <tt>std::pmr::vector</tt>.
-	<br/>
-	- -->
-	
-
-<p><h3> What should be the conversion between <tt>std::optional&lt;T&gt;</tt> and <tt>std::basic_optional&lt;T,Alloc&gt;</tt> ?</p></h3>
+<p><h3> Conversions between <tt>std::optional&lt;T&gt;</tt> and <tt>std::basic_optional&lt;T,Alloc&gt;</tt> </p></h3>
 <p>
 Consider:
 <tt>
@@ -277,16 +226,18 @@ extension because it might inform the implementation design they go for.
 </p>
 
 
-<p><h3> Which allocator should be used in value_or ?</p></h3>
+<p><h3> Allocator used in value_or </h3></p>
 <p>
   It is not all that obvious which allocator should be used for the
   object returned by <tt>value_or</tt>. Should the decision be left to the type
   or should it be mandated by the optional ? That is, should the object
   be constructed by plain copy/move construction or with uses-allocator 
-  construction?
+  construction? The proposal leaves the decision to the value_type. If the user 
+  cares about the allocator of the returned object, it should be explicitly
+  provided by the user. We may consider providing allocator extended version
+  of <tt>value_or</tt> in the future, if this use case proves to be common enough.
   
-
-<h3>Should the deduction guide for mixed optional unpack or not?</p>
+<h3>Deduction guides for mixed optionals unpack</p>
 </h3>
 <p>
 Consider
@@ -321,6 +272,70 @@ treated equally wherever they can. However, it does mean that they are somehow b
 by the standard to work together in a way a user defined type which inherits from <tt>std::optional</tt>
 wouldn't be. 
 </p>
+
+<p><h3> Non allocator aware <tt>basic_optional</tt> is not an alias for <tt>optional</tt> </h3></p>
+<p>
+	An early draft of this proposal suggested using a type alias where a non-AA <tt>basic_optional</tt>
+	aliases <tt>std::optional</tt>, and AA <tt>basic_optional</tt> aliases a new unnamed type. 
+  However, this causes usability issues. Type deduction in cases like :
+<br/><tt>
+<br/><tab2/>template &lt;typename T&gt;
+<br/><tab2/>void foo(basic_optional&lt;T&gt;);
+<br/></tt>
+
+<br/>did not work. The above was equivalent to 
+
+<br/><tt>
+<br/><tab2/>template &lt;typename T, typename Alloc&gt;
+<br/><tab2/>void foo(std::conditional&lt;std::uses_allocator &lt;T, Alloc&lt;&gt;&gt;::value,
+<br/><tab2/><tab2/><tab2/><tab2/><tab2/><i>__basic_optional</i>&ltT&gt,
+<br/><tab2/><tab2/><tab2/><tab2/><tab2/>std::optional&lt;T&gt;&gt;:type);
+<br/></tt>
+<br/> 
+and using the nested <tt>type</tt> of the <tt>std::conditional</tt> as the function template parameter  made for an undeduced context.
+</p>
+
+<p><h3> Free swap has a wide contract </h3></p>
+<p>The free swap function has been made to have a wide contract and work with different allocators, as discussed in 
+P0178 (http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2016/p0178r0.html)
+</p>
+<p><h3> Make facilities are not provided </h3></p>
+<p>
+Make facilities have been deemed unnecessary with the availability of CTAD. The current
+version of the paper doesn't propose <tt>std::make_basic_optional</tt> nor <tt>std::pmr::make_optional</tt>.
+Previous version suggested those be included, but with implementation experience, we found
+a complexity in allowing the allocator type to be both specifiable and defaulted in non
+allocator extended version of the make facility. We deem such complexity unnecessary 
+with the advent of the CTAD feature.
+</p>
+
+<p><h3> Allocator aware types are assumed to be move enabled </h3></p>
+<p>
+<tt>basic_optional</tt> uses explicit allocator construction except in cases where
+invoking a direct <tt>value_type</tt> operation allows for move operations to remain 
+noexcept. This is the case in move constructor for all allocators, and in move assignment for allocators
+that have <tt>propagate_on_container_move_assignment==true</tt>. If the <tt>value_type</tt>
+is allocator aware, but does not support move semantics (i.e. moves deteriorate to copies),
+it is possible that the allocator of the <tt>value_type</tt> object will get out of 
+sync with the allocator of the <tt>basic_optional</tt>. We do not expect such types
+to exist.
+</p>
+
+<h2>Feedback items for LEWG: </h2>
+
+
+<!-- 
+	<h3>Should <tt>std::pmr::optional</tt> be placed in the <tt>&lt;optional&gt;</tt> header?
+</h3>
+	<br/> This proposal puts <tt>std::pmr::optional</tt> in a <tt>optional</tt> header. Historically, pmr containers didn't have their own header files.
+	However, <tt>std::pmr::optional</tt> is a more complex type than, for example, <tt>std::pmr::vector</tt>.
+	<br/>
+	- -->
+	
+
+  
+
+
 </p>
 <p><h3> Should assignments use <t>is_­constructible</t> trait ? </h3> </p>
 <p>It's not construct from U we need, it's construct from U using the allocator. Do we need a new trait ?</p>
@@ -999,14 +1014,15 @@ the expression <tt>*rhs</tt>.
 <br/><tab/><i>Throws:</i> Any exception thrown by the selected constructor of <tt>T</tt>.
 <br/><tab/><i>Mandates:</i><tt>is_­copy­_constructible_­v&lt;T&gt;</tt> is true.
 
+<!-- basic_optional(basic_optional&& rhs) -->
 <br/>
 <br/><code>basic_optional(basic_optional&amp;&amp; rhs) noexcept(<i>see below</i>)</code>
 <br/><tab/><i>Effects:</i> If <tt>uses-alloc</tt> is <tt>true</tt>, <tt><i>alloc</i></tt> is initialized with <tt>rhs.<i>alloc</i></tt>. 
-If <tt>rhs</tt> contains a value, constructs the contained value with uses-allocator construction ([allocator.uses.construction]) with <i>alloc</i> and 
-the expression <tt>std​::​move(*rhs)</tt>. <tt>bool(rhs)</tt> is unchanged.
+If <tt>rhs</tt> contains a value, initialized the contained value the expression <tt>std​::​move(*rhs)</tt>. <tt>bool(rhs)</tt> is unchanged.
 <br/><tab/><i>Ensures:</i> <tt>bool(rhs) == bool(*this)</tt>.
 <br/><tab/><i>Throws:</i> Any exception thrown by the selected constructor of <tt>T</tt>.
-<br/><tab/><i>Remarks:</i> The expression inside <tt>noexcept</tt> is equivalent to <tt>is_­nothrow_­move_­constructible_­v&lt;T&gt;</tt>.
+<br/><tab/><i>Remarks:</i> The expression inside <tt>noexcept</tt> is equivalent to <tt>is_­nothrow_­move_­constructible_­v&lt;T&gt;</tt>. If type is
+not move enabled, the allocator of the resulting <tt>value_type</tt> object may differ from <tt><i>alloc</i></tt>
 <br/><tab/><i>Mandates:</i><tt>is_­move_­constructible_­v&lt;T&gt;</tt> is true.
 <br/>
 <br/><code>basic_optional(const optional&amp;);</code>
@@ -1280,27 +1296,22 @@ This operator shall be defined as deleted unless <tt>is_­copy_­constructible_�
 </tr>
 <tr>
 <td><ins><tt>rhs</tt> contains a value</ins></td>
-<td><ins>If <tt>allocator_traits&lt;Allocator&gt;::propagate_on_container_move_assignment</tt> and 
-<tt>this->get_allocator() != rhs->get_allocator()</tt>is true :
-<br/><tab/> destroys the contained value by calling <tt>val->T::~T()</tt>,
-<br/><tab/> propagates the allocator, and
-<br/> <tab/>initializes the contained value with <tt>std​::​move(*rhs)</tt> by uses-allocator construction with allocator alloc
-<br/> otherwise :
-<br/><tab/>assigns <tt>std​::​move(*rhs)</tt> to the contained value</ins></td>
-<td><ins>If <tt>allocator_traits&lt;Allocator&gt;::propagate_on_container_move_assignment</tt> and 
-<tt>this->get_allocator() != rhs->get_allocator()</tt>is true, propagates the allocator.
-<br/>Initializes the contained value with <tt>std​::​move(*rhs)</tt>. 
-If <tt>uses-alloc</tt>
+<td><ins>If <tt>allocator_traits&lt;Allocator&gt;::propagate_on_container_move_assignment</tt> is true,
+<br/><tab/> propagates the allocator.
+<br/><tab/>Assigns <tt>std​::​move(*rhs)</tt> to the contained value</ins></td>
+<td><ins>If <tt>allocator_traits&lt;Allocator&gt;::propagate_on_container_move_assignment</tt>:
+<br/><tab/> - propagates the allocator
+<br/><tab/> - Initializes the contained value with <tt>std​::​move(*rhs)</tt>. 
+<br/> Otherwise :
+<br/> <tab/>Initializes the contained value with <tt>std​::​move(*rhs)</tt>. If <tt>uses-alloc</tt>
  is <tt>true</tt>, initialization is done by uses-allocator construction 
 with allocator <tt><i>alloc</i></tt> </ins></td>
 </tr>
 <tr>
 <td><ins><tt>rhs</tt> does not contain a value</ins></td>
-<td><ins>If <tt>allocator_traits&lt;Allocator&gt;::propagate_on_container_move_assignment</tt> and 
-<tt>this->get_allocator() != rhs->get_allocator()</tt>is true, propagates the allocator.
+<td><ins>If <tt>allocator_traits&lt;Allocator&gt;::propagate_on_container_move_assignment</tt>, propagates the allocator.
 <br/>Destroys the contained value by calling <tt>val->T::~T()</tt></ins></td>
-<td><ins>If <tt>allocator_traits&lt;Allocator&gt;::propagate_on_container_move_assignment</tt> and 
-<tt>this->get_allocator() != rhs->get_allocator()</tt>is true, propagates the allocator.
+<td><ins>If <tt>allocator_traits&lt;Allocator&gt;::propagate_on_container_move_assignment</tt>, propagates the allocator.
 </ins></td>
 </tr>
 </table></blockquote>
@@ -1313,7 +1324,8 @@ If an exception is thrown during the call to <tt>T</tt>'s move constructor, the 
 the exception safety guarantee of <tt>T</tt>'s move constructor. If an exception is thrown during the call to <tt>T</tt>'s move assignment,
 the state of <tt>*val</tt> and <tt>*rhs.val</tt> is determined by the exception safety guarantee of <tt>T</tt>'s move assignment.
 <br/><tab/><i>Mandates:</i> is_­move_­constructible_­v&lt;T&gt;</tt> is <tt>true</tt> and
- <tt>is_­move_­assignable_­v&lt;T&gt;</tt> is <tt>true</tt>.
+ <tt>is_­move_­assignable_­v&lt;T&gt;</tt> is <tt>true</tt>. If type is
+not move enabled, the allocator of the resulting <tt>value_type</tt> object may differ from <tt><i>alloc</i></tt>
 
 <!-- basic_optional& operator=(U&& v) -->
 <br/>
