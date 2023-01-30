@@ -673,7 +673,7 @@ This operator shall not participate in overload resolution unless
 </tr>
 <tr>
 <td><ins><tt>rhs</tt> does not contain a value</ins></td>
-<td><ins>destroys the contained value by calling <tt>val->T::~T()</tt></ins></td>
+<td><ins>destroys the contained value by calling <tt>val-&gt;T::~T()</tt></ins></td>
 <td><ins>no effect</ins></td>
 </tr>
 </table></blockquote>
@@ -732,7 +732,7 @@ determined by the exception safety guarantee of <tt>T</tt>'s assignment.
 </tr>
 <tr>
 <td><ins><tt>rhs</tt> does not contain a value</ins></td>
-<td><ins>destroys the contained value by calling <tt>val->T::~T()</tt></ins></td>
+<td><ins>destroys the contained value by calling <tt>val-&gt;T::~T()</tt></ins></td>
 <td><ins>no effect</ins></td>
 </tr>
 </table></blockquote>
@@ -871,16 +871,16 @@ namespace std::pmr {
 <br/>&nbsp; &nbsp;&nbsp; &nbsp;	constexpr optional&lt;<i>see below</i>&gt; make_optional(T&amp;&amp;);
 <br/>&nbsp; &nbsp;   template&lt;class T&gt;
 <br/>&nbsp; &nbsp;&nbsp; &nbsp;    constexpr optional&lt;T&gt; make_optional();
-<br/>&nbsp; &nbsp;   template&lt;class T, class Arg0, class... Args>
+<br/>&nbsp; &nbsp;   template&lt;class T, class Arg0, class... Args&gt;
 <br/>&nbsp; &nbsp;&nbsp; &nbsp;	constexpr optional&lt;T&gt; make_optional(Arg0 arg0&amp;&amp;, Args&amp;&amp;... args);
-<br/>&nbsp; &nbsp;   template&lt;class T, class U, class... Args>
+<br/>&nbsp; &nbsp;   template&lt;class T, class U, class... Args&gt;
 <br/>&nbsp; &nbsp;&nbsp; &nbsp;	constexpr optional&lt;T&gt; make_optional(initializer_list&lt;U&gt; il, Args&amp;&amp;... args);
 <br/>
 <br/>&nbsp; &nbsp;   template&lt;class T&gt;
 <br/>&nbsp; &nbsp;&nbsp; &nbsp;	constexpr optional&lt;<i>see below</i>&gt; make_optional(allocator_arg_t, const polymorphic_allocator&lt;&gt;&amp; a, T&amp;&amp;);
-<br/>&nbsp; &nbsp;   template&lt;class T, class... Args>
+<br/>&nbsp; &nbsp;   template&lt;class T, class... Args&gt;
 <br/>&nbsp; &nbsp;&nbsp; &nbsp;	constexpr optional&lt;T&gt; make_optional(allocator_arg_t, const polymorphic_allocator&lt;&gt;&amp; a, Args&amp;&amp;... args);
-<br/>&nbsp; &nbsp;   template&lt;class T, class U, class... Args>
+<br/>&nbsp; &nbsp;   template&lt;class T, class U, class... Args&gt;
 <br/>&nbsp; &nbsp;&nbsp; &nbsp;	constexpr optional&lt;T&gt; make_optional(allocator_arg_t, const polymorphic_allocator&lt;&gt;&amp; a, initializer_list&lt;U&gt; il, Args&amp;&amp;... args);
 <br/>
  <br/>&nbsp; &nbsp; // [pmroptional.hash], hash support
@@ -956,7 +956,7 @@ namespace std::pmr {
 <br/>&nbsp; &nbsp;&nbsp; &nbsp;    template&lt;class U&gt; optional&amp; operator=(optional&lt;U&gt;&amp;&amp;);
 <br/>&nbsp; &nbsp;&nbsp; &nbsp;    template&lt;class U&gt; optional&amp; operator=(const std::optional&lt;U&gt;&amp;);
 <br/>&nbsp; &nbsp;&nbsp; &nbsp;    template&lt;class U&gt; optional&amp; operator=(std::optional&lt;U&gt;&amp;&amp;);
-<br/>&nbsp; &nbsp;&nbsp; &nbsp;    template&lt;class... Args&gt;> T&amp; emplace(Args&amp;&amp;...);
+<br/>&nbsp; &nbsp;&nbsp; &nbsp;    template&lt;class... Args&gt; T&amp; emplace(Args&amp;&amp;...);
 <br/>&nbsp; &nbsp;&nbsp; &nbsp;    template&lt;class U, class... Args&gt; T&amp; emplace(initializer_list&lt;U&gt;, Args&amp;&amp;...);
 <br/>
 <br/>&nbsp; &nbsp;&nbsp; &nbsp;    // [pmroptional.swap], swap
@@ -1256,14 +1256,14 @@ with <i>alloc</i> and <tt>std::move(*rhs)</tt>.
 <blockquote><ins>
 <br/><tt>~optional();</tt>
 <br/>&nbsp; &nbsp;<i>Effects:</i> If <tt>is_trivially_destructible_v&lt;T&gt; != true</tt> and <tt>*this</tt> contains a value, calls
-<tt>val->T::~T()</tt>
+<tt>val-&gt;T::~T()</tt>
 <br/>&nbsp; &nbsp;<i>Remarks:</i> If <tt>is_trivially_destructible_v&lt;T&gt;</tt> is <tt>true</tt>, then this destructor is trivial.
 </ins></blockquote>
 
 <h4><ins> Assignment [pmroptional.assign]</ins></h4>
 <blockquote><ins>
 <br/><tt>optional&lt;T&gt;&amp; operator=(nullopt_t) noexcept;</tt>
-<br/>&nbsp; &nbsp;<i>Effects:</i> If <tt>*this</tt> contains a value, calls <tt>val->T::~T()</tt> to destroy the contained value; otherwise
+<br/>&nbsp; &nbsp;<i>Effects:</i> If <tt>*this</tt> contains a value, calls <tt>val-&gt;T::~T()</tt> to destroy the contained value; otherwise
 no effect.
 <br/>&nbsp; &nbsp;<i>Remarks:</i> <tt>*this</tt>
 <br/>&nbsp; &nbsp;<i>Ensures:</i> <tt>*this</tt> does not contain a value.
@@ -1323,14 +1323,14 @@ with allocator <tt><i>alloc</i></tt> </ins></td>
 </tr>
 <tr>
 <td><ins><tt>rhs</tt> does not contain a value</ins></td>
-<td><ins>destroys the contained value by calling <tt>val->T::~T()</tt></ins></td>
+<td><ins>destroys the contained value by calling <tt>val-&gt;T::~T()</tt></ins></td>
 <td><ins>no effect</ins></td>
 </tr>
 </table></blockquote>
 <br/>&nbsp; &nbsp;<i>Returns:</i> <tt>*this</tt>.
 <br/>&nbsp; &nbsp;<i>Ensures:</i> <tt>bool(rhs) == bool(*this)</tt>.
 <br/>&nbsp; &nbsp;<i>Remarks:</i> The expression inside <tt>noexcept</tt> is equivalent to:
-<br/>&nbsp; &nbsp;&nbsp; &nbsp;<code>is_nothrow_move_assignable_v&lt;T&gt; && is_nothrow_move_constructible_v&lt;T&gt;</code>
+<br/>&nbsp; &nbsp;&nbsp; &nbsp;<code>is_nothrow_move_assignable_v&lt;T&gt; &amp;&amp; is_nothrow_move_constructible_v&lt;T&gt;</code>
 <br/>&nbsp; &nbsp;If any exception is thrown, the result of the expression <tt>bool(*this)</tt> remains unchanged.
 If an exception is thrown during the call to <tt>T</tt>'s move constructor, the state of <tt>*rhs.val</tt> is determined by
 the exception safety guarantee of <tt>T</tt>'s move constructor. If an exception is thrown during the call to <tt>T</tt>'s move assignment,
@@ -1378,7 +1378,7 @@ with allocator <tt><i>alloc</i></tt> </ins></td>
 </tr>
 <tr>
 <td><ins><tt>rhs</tt> does not contain a value</ins></td>
-<td><ins>destroys the contained value by calling <tt>val->T::~T()</tt></ins></td>
+<td><ins>destroys the contained value by calling <tt>val-&gt;T::~T()</tt></ins></td>
 <td><ins>no effect</ins></td>
 </tr>
 </table></blockquote>
@@ -1438,7 +1438,7 @@ with allocator <tt><i>alloc</i></tt>.</ins></td>
 </tr>
 <tr>
 <td><ins><tt>rhs</tt> does not contain a value</ins></td>
-<td><ins>destroys the contained value by calling <tt>val->T::~T()</tt></ins></td>
+<td><ins>destroys the contained value by calling <tt>val-&gt;T::~T()</tt></ins></td>
 <td><ins>no effect</ins></td>
 </tr>
 </table></blockquote>
@@ -1497,7 +1497,7 @@ with allocator <tt><i>alloc</i></tt> .</ins></td>
 </tr>
 <tr>
 <td><ins><tt>rhs</tt> does not contain a value</ins></td>
-<td><ins>destroys the contained value by calling <tt>val->T::~T()</tt></ins></td>
+<td><ins>destroys the contained value by calling <tt>val-&gt;T::~T()</tt></ins></td>
 <td><ins>no effect</ins></td>
 </tr>
 </table></blockquote>
@@ -1558,7 +1558,7 @@ with allocator <tt><i>alloc</i></tt> </ins></td>
 </tr>
 <tr>
 <td><ins><tt>rhs</tt> does not contain a value</ins></td>
-<td><ins>destroys the contained value by calling <tt>val->T::~T()</tt></ins></td>
+<td><ins>destroys the contained value by calling <tt>val-&gt;T::~T()</tt></ins></td>
 <td><ins>no effect</ins></td>
 </tr>
 </table></blockquote>
@@ -1599,7 +1599,7 @@ the state of <tt>*val</tt> and <tt>*rhs.val</tt> is determined by the exception 
 
 
 <br/>
-<br/><code>  template&lt;class... Args&gt;> T&amp; emplace(Args&amp;&amp;...);</code>
+<br/><code>  template&lt;class... Args&gt; T&amp; emplace(Args&amp;&amp;...);</code>
 <br/>&nbsp; &nbsp;<i>Constraints:</i> <tt>is_constructible_v&lt;T, Args&amp;&amp;...&gt; </tt>is true.
 <br/>&nbsp; &nbsp;<i>Effects:</i> Calls <tt>*this = nullopt</tt>. Then initializes the contained value 
 with <tt>std::forward&lt;Args&gt;(args)....</tt>. If <tt>uses-poly-alloc</tt>
@@ -1654,7 +1654,7 @@ of <tt>T</tt>’s move constructor.
 <td><ins><tt>rhs</tt> contains a value</ins></td>
 <td><ins>calls <tt>swap(*(*this), *rhs)</tt></ins></td>
 <td><ins>initializes the contained value with
-<tt>std::move(*rhs)</tt> as the constructor argument, followed by <tt>rhs.val->T::~T()</tt>;
+<tt>std::move(*rhs)</tt> as the constructor argument, followed by <tt>rhs.val-&gt;T::~T()</tt>;
 If <tt>uses-poly-alloc</tt>
  is <tt>true</tt>, initialization is done by uses-allocator construction 
 with allocator <tt><i>alloc</i></tt>.
@@ -1663,7 +1663,7 @@ Postcondition is that <tt>*this</tt> contains a value and <tt>rhs</tt> does not 
 <tr>
 <td><ins><tt>rhs</tt> does not contain a value</ins></td>
 <td><ins>initializes the contained value with
-<tt>std::move(*(*this))</tt> as the constructor argument, followed by <tt>val->T::~T()</tt>; 
+<tt>std::move(*(*this))</tt> as the constructor argument, followed by <tt>val-&gt;T::~T()</tt>; 
 If <tt>uses-poly-alloc</tt>
  is <tt>true</tt>, initialization is done by uses-allocator construction 
 with allocator <tt><i>alloc</i></tt>.
@@ -1724,7 +1724,7 @@ Postcondition is that <tt>*this</tt> does not contain a value and <tt>rhs</tt> c
 <br/>&nbsp; &nbsp;<i>Effects:</i> Equivalent to:
 <br/>&nbsp; &nbsp;&nbsp; &nbsp;<tt>return bool(*this) ? **this : static_cast&lt;T&gt;(std::forward&lt;U&gt;(v));</tt>
 <br/>&nbsp; &nbsp;<i>Remarks:</i> If <tt>is_copy_constructible_v&lt;T&gt;
-&& is_convertible_v&lt;U&amp;&amp;, T&gt;</tt> is <tt>false</tt>,
+&amp;&amp; is_convertible_v&lt;U&amp;&amp;, T&gt;</tt> is <tt>false</tt>,
 the program is ill-formed.
 
 <br/>
@@ -1732,7 +1732,7 @@ the program is ill-formed.
 <br/>&nbsp; &nbsp;<i>Effects:</i> Equivalent to:
 <br/>&nbsp; &nbsp;&nbsp; &nbsp;<tt>return bool(*this) ? std::move(**this) : static_cast&lt;T&gt;(std::forward&lt;U&gt;(v));</tt>
 <br/>&nbsp; &nbsp;<i>Remarks:</i> If <tt>is_move_constructible_v&lt;T&gt;
-&& is_convertible_v&lt;U&amp;&amp;, T&gt;</tt> is <tt>false</tt>,
+&amp;&amp; is_convertible_v&lt;U&amp;&amp;, T&gt;</tt> is <tt>false</tt>,
 the program is ill-formed.
 
 
@@ -1744,7 +1744,7 @@ uses-allocator construction with allocator <tt>a</tt> and <tt>**this</tt> as the
 Otherwise, returns an object of type <tt>T</tt> initialized by
 uses-allocator construction with allocator <tt>a</tt> and <tt>std::forward&lt;U&gt;(v)</tt> as the constructor argument.
 <br/>&nbsp; &nbsp;<i>Remarks:</i> If <tt>is_copy_constructible_v&lt;T&gt;
-&& is_convertible_v&lt;U&amp;&amp;, T&gt;</tt> is <tt>false</tt>,
+&amp;&amp; is_convertible_v&lt;U&amp;&amp;, T&gt;</tt> is <tt>false</tt>,
 the program is ill-formed.
 
 <br/>
@@ -1755,7 +1755,7 @@ uses-allocator construction with allocator <tt>a</tt> and <tt>std::move(**this)<
 Otherwise, returns an object of type <tt>T</tt> initialized by
 uses-allocator construction with allocator <tt>a</tt> and <tt>std::forward&lt;U&gt;(v)</tt> as the constructor argument.
 <br/>&nbsp; &nbsp;<i>Remarks:</i> If <tt>is_copy_constructible_v&lt;T&gt;
-&& is_convertible_v&lt;U&amp;&amp;, T&gt;</tt> is <tt>false</tt>,
+&amp;&amp; is_convertible_v&lt;U&amp;&amp;, T&gt;</tt> is <tt>false</tt>,
 the program is ill-formed.
 
 <br/>
@@ -1772,7 +1772,7 @@ the program is ill-formed.
 <blockquote><ins>
 
 <br/><tt>void reset() noexcept;</tt>
-<br/>&nbsp; &nbsp;<i>Effects:</i> If <tt>*this</tt> contains a value, calls <tt>val->T::~T()</tt> to destroy the contained value; otherwise no effect.
+<br/>&nbsp; &nbsp;<i>Effects:</i> If <tt>*this</tt> contains a value, calls <tt>val-&gt;T::~T()</tt> to destroy the contained value; otherwise no effect.
 <br/>&nbsp; &nbsp;<i>Ensures:</i> <tt>*this</tt> does not contain a value.
 
 </ins></blockquote>
@@ -2004,7 +2004,7 @@ otherwise <tt>*x &gt;= *y</tt>.
 <tt>uses-poly-alloc::value</tt> is <tt>false</tt>.
 
 <br/>
-<br/>&nbsp; &nbsp;<tt>   template&lt;class T, class U, class... Args> optional&lt;T&gt; </tt>
+<br/>&nbsp; &nbsp;<tt>   template&lt;class T, class U, class... Args&gt; optional&lt;T&gt; </tt>
 <br/>&nbsp; &nbsp;&nbsp; &nbsp;<tt>  constexpr make_optional(initializer_list&lt;U&gt; il, Args&amp;&amp;... args);</tt>
 <br/>&nbsp; &nbsp;<i>Effects: </i> Equivalent to: <tt> return optional&lt;T&gt;(in_place, il, std::forward&lt;Args&gt;(args)...).</tt>
 <br/>&nbsp; &nbsp;<i>Remarks: </i> Specialization of this function template shall be a constexpr function if  
@@ -2017,13 +2017,13 @@ otherwise <tt>*x &gt;= *y</tt>.
 <br/>&nbsp; &nbsp;<i>Returns: </i> <tt>optional&lt;decay_t&lt;T&gt;&gt;(allocator_arg, a, in_place, std::forward&lt;T&gt;(v)).</tt>
 
 <br/>
-<br/>&nbsp; &nbsp;<tt>   template&lt;class T, class... Args> optional&lt;T&gt; </tt>
+<br/>&nbsp; &nbsp;<tt>   template&lt;class T, class... Args&gt; optional&lt;T&gt; </tt>
 <br/>&nbsp; &nbsp;&nbsp; &nbsp;<tt>  make_optional(allocator_arg_t, const polymorphic_allocator&lt;&gt;&amp; a, Args&amp;&amp;... args);</tt>
 <br/>&nbsp; &nbsp;<i>Mandates:</i> <tt>uses_allocator&lt;T,polymorphic_allocator&lt;&gt;&gt;</tt> is true;
 <br/>&nbsp; &nbsp;<i>Effects: </i> Equivalent to: <tt> return optional&lt;T&gt;(allocator_arg, a, in_place, std::forward&lt;Args&gt;(args)...).</tt>
 
 <br/>
-<br/>&nbsp; &nbsp;<tt>   template&lt;class T, class U, class... Args> optional&lt;T&gt;</tt>
+<br/>&nbsp; &nbsp;<tt>   template&lt;class T, class U, class... Args&gt; optional&lt;T&gt;</tt>
 <br/>&nbsp; &nbsp;&nbsp; &nbsp;<tt>  make_optional(allocator_arg_t, const polymorphic_allocator&lt;&gt;&amp; a, initializer_list&lt;U&gt; il, Args&amp;&amp;... args);</tt>
 <br/>&nbsp; &nbsp;<i>Mandates:</i> <tt>uses_allocator&lt;T,polymorphic_allocator&lt;&gt;&gt;</tt> is true;
 <br/>&nbsp; &nbsp;<i>Effects: </i> Equivalent to: <tt> return optional&lt;T&gt;(allocator_arg, a, in_place, il, std::forward&lt;Args&gt;(args)...).</tt>
