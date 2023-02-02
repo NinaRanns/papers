@@ -24,7 +24,7 @@
 <body>
 
 <address align=right>
-Document number: P2047R5
+Document number: P2047R6
 <br/>
 Audience: LEWG
 <br/>
@@ -32,7 +32,7 @@ Audience: LEWG
 <a href="mailto:ville.voutilainen@gmail.com">Ville Voutilainen</a><br/>
 <a href="mailto:dinka.ranns@gmail.com">Nina Dinka Ranns</a><br/>
 <a href="mailto:phalpern@halpernwightsoftware.com">Pablo Halpern</a><br/>
-2023-01-04<br/>
+2023-02-02<br/>
 </address>
 <hr/>
 <h1 align=center>An allocator-aware optional type</h1>
@@ -102,6 +102,8 @@ do any allocation, and that the name is not appropriate
 <br/> - removed make facilities
 <br/>R6:
 <br/> - cleaning up html format
+<br/> - clean up of proposed wording
+
 
  
 <h2>Motivation and Proposal Summary</h2>
@@ -424,7 +426,7 @@ Add new paragraphs after 20.6.1/p1 [optional.general]
 </blockquote>
 </p>
 <p>Modify 20.6.3.1 Constructors [optional.ctor] </p>
-<!--
+<!-- removed because constraints do not change
 <p>
 <blockquote>
 <p>
@@ -486,21 +488,13 @@ Add new paragraphs after 20.6.1/p1 [optional.general]
 <br/><tab/><i>Mandates:</i>
 <br/><tab2/> - <tt>is_constructible_v&lt;T, const U&amp;&gt;</tt> is <tt>true</tt>,
 <br/><tab2/> - <tt>is_same&lt;T,U&gt;</tt> is <tt>false</tt>,
-<br/><tab2/> - <tt>is_constructible_v&lt;T, optional&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>,
 <br/><tab2/> - <tt>is_constructible_v&lt;T, basic_optional&lt;U, Allocator&gt;&amp;&gt;</tt> is <tt>false</tt>,
-<br/><tab2/> - <tt>is_constructible_v&lt;T, optional&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>,
 <br/><tab2/> - <tt>is_constructible_v&lt;T, basic_optional&lt;U, Allocator&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>,
-<br/><tab2/> - <tt>is_constructible_v&lt;T, const optional&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>,
 <br/><tab2/> - <tt>is_constructible_v&lt;T, const basic_optional&lt;U, Allocator&gt;&amp;&gt;</tt> is <tt>false</tt>,
-<br/><tab2/> - <tt>is_constructible_v&lt;T, const optional&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>,
 <br/><tab2/> - <tt>is_constructible_v&lt;T, const basic_optional&lt;U, Allocator&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>,
-<br/><tab2/> - <tt>is_convertible_v&lt;optional&lt;U&gt;&amp;, T&gt;</tt> is <tt>false</tt>,
 <br/><tab2/> - <tt>is_convertible_v&lt;basic_optional&lt;U, Allocator&gt;&amp;, T&gt;</tt> is <tt>false</tt>,
-<br/><tab2/> - <tt>is_convertible_v&lt;optional&lt;U&gt;&amp;&amp;, T&gt;</tt> is <tt>false</tt>,
 <br/><tab2/> - <tt>is_convertible_v&lt;basic_optional&lt;U, Allocator&gt;&amp;&amp;, T&gt;</tt> is <tt>false</tt>,
-<br/><tab2/> - <tt>is_convertible_v&lt;const optional&lt;U&gt;&amp;, T&gt;</tt> is <tt>false</tt>,
 <br/><tab2/> - <tt>is_convertible_v&lt;const basic_optional&lt;U, Allocator&gt;&amp;, T&gt;</tt> is <tt>false</tt>,
-<br/><tab2/> - <tt>is_convertible_v&lt;const optional&lt;U&gt;&amp;&amp;, T&gt;</tt> is <tt>false</tt>, and
 <br/><tab2/> - <tt>is_convertible_v&lt;const basic_optional&lt;U, Allocator&gt;&amp;&amp;, T&gt;</tt> is <tt>false</tt>
 <br/>     
 
@@ -516,21 +510,13 @@ Add new paragraphs after 20.6.1/p1 [optional.general]
 <br/><tab/><i>Mandates:</i>
 <br/><tab2/> - <tt>is_constructible_v&lt;T,U&amp;&amp;&gt;</tt> is <tt>true</tt>,
 <br/><tab2/> - <tt>is_same&lt;T,U&gt;</tt> is <tt>false</tt>,
-<br/><tab2/> - <tt>is_constructible_v&lt;T, optional&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>,
 <br/><tab2/> - <tt>is_constructible_v&lt;T, basic_optional&lt;U, Allocator&gt;&amp;&gt;</tt> is <tt>false</tt>,
-<br/><tab2/> - <tt>is_constructible_v&lt;T, optional&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>,
 <br/><tab2/> - <tt>is_constructible_v&lt;T, basic_optional&lt;U, Allocator&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>,
-<br/><tab2/> - <tt>is_constructible_v&lt;T, const optional&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>,
 <br/><tab2/> - <tt>is_constructible_v&lt;T, const basic_optional&lt;U, Allocator&gt;&amp;&gt;</tt> is <tt>false</tt>,
-<br/><tab2/> - <tt>is_constructible_v&lt;T, const optional&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>,
 <br/><tab2/> - <tt>is_constructible_v&lt;T, const basic_optional&lt;U, Allocator&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>,
-<br/><tab2/> - <tt>is_convertible_v&lt;optional&lt;U&gt;&amp;, T&gt;</tt> is <tt>false</tt>,
 <br/><tab2/> - <tt>is_convertible_v&lt;basic_optional&lt;U, Allocator&gt;&amp;, T&gt;</tt> is <tt>false</tt>,
-<br/><tab2/> - <tt>is_convertible_v&lt;optional&lt;U&gt;&amp;&amp;, T&gt;</tt> is <tt>false</tt>,
 <br/><tab2/> - <tt>is_convertible_v&lt;basic_optional&lt;U, Allocator&gt;&amp;&amp;, T&gt;</tt> is <tt>false</tt>,
-<br/><tab2/> - <tt>is_convertible_v&lt;const optional&lt;U&gt;&amp;, T&gt;</tt> is <tt>false</tt>,
 <br/><tab2/> - <tt>is_convertible_v&lt;const basic_optional&lt;U, Allocator&gt;&amp;, T&gt;</tt> is <tt>false</tt>,
-<br/><tab2/> - <tt>is_convertible_v&lt;const optional&lt;U&gt;&amp;&amp;, T&gt;</tt> is <tt>false</tt>, and
 <br/><tab2/> - <tt>is_convertible_v&lt;const basic_optional&lt;U, Allocator&gt;&amp;&amp;, T&gt;</tt> is <tt>false</tt>
 <br/>    
 </p>
@@ -540,74 +526,6 @@ Add new paragraphs after 20.6.1/p1 [optional.general]
 <p>
 <blockquote>
 ...
-<!--
-<br/><tt>template&lt;class U&gt; optional&amp; operator=(const optional&lt;U&gt;&amp; rhs);</tt>
-...
-<br/><tab/><i>Remarks:</i> ...
-This operator shall not participate in overload resolution unless
-<br/><tab2/> - <tt>is_constructible_v&lt;T, const U&amp;&gt;</tt> is <tt>true</tt>,
-<br/><tab2/> - <tt>is_assignable&lt;T&amp;, const U&amp;&gt;</tt> is <tt>true</tt>,
-<br/><tab2/> - <tt>is_constructible_v&lt;T, optional&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>,
-<br/><tab2/><ins> - <tt>is_constructible_v&lt;T, pmr::optional&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>, </ins>
-<br/><tab2/> - <tt>is_constructible_v&lt;T, optional&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>,
-<br/><tab2/><ins>  - <tt>is_constructible_v&lt;T, pmr::optional&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>, </ins>
-<br/><tab2/> - <tt>is_constructible_v&lt;T, const optional&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>,
-<br/><tab2/><ins>  - <tt>is_constructible_v&lt;T, const pmr::optional&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>, </ins>
-<br/><tab2/> - <tt>is_constructible_v&lt;T, const optional&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>,
-<br/><tab2/><ins>  - <tt>is_constructible_v&lt;T, const pmr::optional&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>, </ins>
-<br/><tab2/> - <tt>is_convertible_v&lt;optional&lt;U&gt;&amp;, T&gt;</tt> is <tt>false</tt>,
-<br/><tab2/><ins>  - <tt>is_convertible_v&lt;pmr::optional&lt;U&gt;&amp;, T&gt;</tt> is <tt>false</tt>, </ins>
-<br/><tab2/> - <tt>is_convertible_v&lt;optional&lt;U&gt;&amp;&amp;, T&gt;</tt> is <tt>false</tt>,
-<br/><tab2/><ins>  - <tt>is_convertible_v&lt;pmr::optional&lt;U&gt;&amp;&amp;, T&gt;</tt> is <tt>false</tt>, </ins>
-<br/><tab2/> - <tt>is_convertible_v&lt;const optional&lt;U&gt;&amp;, T&gt;</tt> is <tt>false</tt>,
-<br/><tab2/><ins>  - <tt>is_convertible_v&lt;const pmr::optional&lt;U&gt;&amp;, T&gt;</tt> is <tt>false</tt>, </ins>
-<br/><tab2/> - <tt>is_convertible_v&lt;const optional&lt;U&gt;&amp;&amp;, T&gt;</tt> is <tt>false</tt>,
-<br/><tab2/><ins>  - <tt>is_convertible_v&lt;const pmr::optional&lt;U&gt;&amp;&amp;, T&gt;</tt> is <tt>false</tt>, </ins>
-<br/><tab2/> - <tt>is_assignable_v&lt;T&amp;, optional&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>,
-<br/><tab2/><ins>  - <tt>is_assignable_v&lt;T&amp;, pmr::optional&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>, </ins>
-<br/><tab2/> - <tt>is_assignable_v&lt;T&amp;, optional&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>,
-<br/><tab2/><ins>  - <tt>is_assignable_v&lt;T&amp;, pmr::optional&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>, </ins>
-<br/><tab2/> - <tt>is_assignable_v&lt;T&amp;, const optional&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>, <del>and</del>
-<br/><tab2/><ins>  - <tt>is_assignable_v&lt;T&amp;, const pmr::optional&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>, </ins>
-<br/><tab2/> - <tt>is_assignable_v&lt;T&amp;, const optional&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>,<ins>and</ins>
-<br/><tab2/><ins>  - <tt>is_assignable_v&lt;T&amp;, const pmr::optional&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt> </ins>
-</blockquote>
-</p>
-<p>
-<blockquote>
-
-<br/><tt>template&lt;class U&gt; optional&amp; operator=(optional&lt;U&gt;&amp;&amp; rhs);</tt>
-...
-<br/><tab/><i>Remarks:</i> ...
-This operator shall not participate in overload resolution unless
-<br/><tab2/> - <tt>is_constructible_v&lt;T, const U&amp;&gt;</tt> is <tt>true</tt>,
-<br/><tab2/> - <tt>is_assignable&lt;T&amp;, const U&amp;&gt;</tt> is <tt>true</tt>,
-<br/><tab2/> - <tt>is_constructible_v&lt;T, optional&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>,
-<br/><tab2/><ins> - <tt>is_constructible_v&lt;T, pmr::optional&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>, </ins>
-<br/><tab2/> - <tt>is_constructible_v&lt;T, optional&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>,
-<br/><tab2/><ins>  - <tt>is_constructible_v&lt;T, pmr::optional&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>, </ins>
-<br/><tab2/> - <tt>is_constructible_v&lt;T, const optional&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>,
-<br/><tab2/><ins>  - <tt>is_constructible_v&lt;T, const pmr::optional&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>, </ins>
-<br/><tab2/> - <tt>is_constructible_v&lt;T, const optional&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>,
-<br/><tab2/><ins>  - <tt>is_constructible_v&lt;T, const pmr::optional&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>, </ins>
-<br/><tab2/> - <tt>is_convertible_v&lt;optional&lt;U&gt;&amp;, T&gt;</tt> is <tt>false</tt>,
-<br/><tab2/><ins>  - <tt>is_convertible_v&lt;pmr::optional&lt;U&gt;&amp;, T&gt;</tt> is <tt>false</tt>, </ins>
-<br/><tab2/> - <tt>is_convertible_v&lt;optional&lt;U&gt;&amp;&amp;, T&gt;</tt> is <tt>false</tt>,
-<br/><tab2/><ins>  - <tt>is_convertible_v&lt;pmr::optional&lt;U&gt;&amp;&amp;, T&gt;</tt> is <tt>false</tt>, </ins>
-<br/><tab2/> - <tt>is_convertible_v&lt;const optional&lt;U&gt;&amp;, T&gt;</tt> is <tt>false</tt>,
-<br/><tab2/><ins>  - <tt>is_convertible_v&lt;const pmr::optional&lt;U&gt;&amp;, T&gt;</tt> is <tt>false</tt>, </ins>
-<br/><tab2/> - <tt>is_convertible_v&lt;const optional&lt;U&gt;&amp;&amp;, T&gt;</tt> is <tt>false</tt>,
-<br/><tab2/><ins>  - <tt>is_convertible_v&lt;const pmr::optional&lt;U&gt;&amp;&amp;, T&gt;</tt> is <tt>false</tt>, </ins>
-<br/><tab2/> - <tt>is_assignable_v&lt;T&amp;, optional&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>,
-<br/><tab2/><ins>  - <tt>is_assignable_v&lt;T&amp;, pmr::optional&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>, </ins>
-<br/><tab2/> - <tt>is_assignable_v&lt;T&amp;, optional&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>,
-<br/><tab2/><ins>  - <tt>is_assignable_v&lt;T&amp;, pmr::optional&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>, </ins>
-<br/><tab2/> - <tt>is_assignable_v&lt;T&amp;, const optional&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>, <del>and</del>
-<br/><tab2/><ins>  - <tt>is_assignable_v&lt;T&amp;, const pmr::optional&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>, </ins>
-<br/><tab2/> - <tt>is_assignable_v&lt;T&amp;, const optional&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>,<ins>and</ins> 
-<br/><tab2/><ins>  - <tt>is_assignable_v&lt;T&amp;, const pmr::optional&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt> </ins>
-</blockquote>
-</p>
 <blockquote><ins>
 <br/>
 <br/><tt>template&lt;class U, class Allocator&gt; optional&amp; operator=(const basic_optional&lt;U, Allocator&gt;&amp; rhs);</tt>
@@ -642,30 +560,18 @@ determined by the exception safety guarantee of <tt>T</tt>'s assignment.
 <br/><tab2/> - <tt>is_same&lt;T,U&gt;</tt> is <tt>false</tt>,
 <br/><tab2/> - <tt>is_constructible_v&lt;T, const U&amp;&gt;</tt> is <tt>true</tt>,
 <br/><tab2/> - <tt>is_assignable&lt;T&amp;, const U&amp;&gt;</tt> is <tt>true</tt>,
-<br/><tab2/> - <tt>is_constructible_v&lt;T, optional&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>,
 <br/><tab2/> - <tt>is_constructible_v&lt;T, basic_optional&lt;U, Allocator&gt;&amp;&gt;</tt> is <tt>false</tt>,
-<br/><tab2/> - <tt>is_constructible_v&lt;T, optional&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>, 
 <br/><tab2/> - <tt>is_constructible_v&lt;T, basic_optional&lt;U, Allocator&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>,
-<br/><tab2/> - <tt>is_constructible_v&lt;T, const optional&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>,
 <br/><tab2/> - <tt>is_constructible_v&lt;T, const basic_optional&lt;U, Allocator&gt;&amp;&gt;</tt> is <tt>false</tt>,
-<br/><tab2/> - <tt>is_constructible_v&lt;T, const optional&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>, 
 <br/><tab2/> - <tt>is_constructible_v&lt;T, const basic_optional&lt;U, Allocator&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>,
 <br/><tab2/> - <tt>is_convertible_v&lt;const U&amp;, T&gt;</tt> is <tt>true</tt>,
-<br/><tab2/> - <tt>is_convertible_v&lt;optional&lt;U&gt;&amp;, T&gt;</tt> is <tt>false</tt>,
 <br/><tab2/> - <tt>is_convertible_v&lt;basic_optional&lt;U, Allocator&gt;&amp;, T&gt;</tt> is <tt>false</tt>,
-<br/><tab2/> - <tt>is_convertible_v&lt;optional&lt;U&gt;&amp;&amp;, T&gt;</tt> is <tt>false</tt>, 
 <br/><tab2/> - <tt>is_convertible_v&lt;basic_optional&lt;U, Allocator&gt;&amp;&amp;, T&gt;</tt> is <tt>false</tt>,
-<br/><tab2/> - <tt>is_convertible_v&lt;const optional&lt;U&gt;&amp;, T&gt;</tt> is <tt>false</tt>,
 <br/><tab2/> - <tt>is_convertible_v&lt;const basic_optional&lt;U, Allocator&gt;&amp;, T&gt;</tt> is <tt>false</tt>,
-<br/><tab2/> - <tt>is_convertible_v&lt;const optional&lt;U&gt;&amp;&amp;, T&gt;</tt> is <tt>false</tt>,
 <br/><tab2/> - <tt>is_convertible_v&lt;const basic_optional&lt;U, Allocator&gt;&amp;&amp;, T&gt;</tt> is <tt>false</tt>,
-<br/><tab2/> - <tt>is_assignable_v&lt;T&amp;, optional&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>,
 <br/><tab2/> - <tt>is_assignable_v&lt;T&amp;, basic_optional&lt;U, Allocator&gt;&amp;&gt;</tt> is <tt>false</tt>,
-<br/><tab2/> - <tt>is_assignable_v&lt;T&amp;, optional&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>, 
 <br/><tab2/> - <tt>is_assignable_v&lt;T&amp;, basic_optional&lt;U, Allocator&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>,
-<br/><tab2/> - <tt>is_assignable_v&lt;T&amp;, const optional&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>,
 <br/><tab2/> - <tt>is_assignable_v&lt;T&amp;, const basic_optional&lt;U, Allocator&gt;&amp;&gt;</tt> is <tt>false</tt>,
-<br/><tab2/> - <tt>is_assignable_v&lt;T&amp;, const optional&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>, and
 <br/><tab2/> - <tt>is_assignable_v&lt;T&amp;, const basic_optional&lt;U, Allocator&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>
 
 <br/>
@@ -700,30 +606,18 @@ determined by the exception safety guarantee of <tt>T</tt>'s assignment.
 <br/><tab/><i>Mandates:</i>
 <br/><tab2/> - <tt>is_constructible_v&lt;T, const U&amp;&gt;</tt> is <tt>true</tt>,
 <br/><tab2/> - <tt>is_assignable&lt;T&amp;, const U&amp;&gt;</tt> is <tt>true</tt>,
-<br/><tab2/> - <tt>is_constructible_v&lt;T, optional&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>,
 <br/><tab2/> - <tt>is_constructible_v&lt;T, basic_optional&lt;U, Allocator&gt;&amp;&gt;</tt> is <tt>false</tt>,
-<br/><tab2/> - <tt>is_constructible_v&lt;T, optional&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>,
 <br/><tab2/> - <tt>is_constructible_v&lt;T, basic_optional&lt;U, Allocator&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>,
-<br/><tab2/> - <tt>is_constructible_v&lt;T, const optional&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>,
 <br/><tab2/> - <tt>is_constructible_v&lt;T, const basic_optional&lt;U, Allocator&gt;&amp;&gt;</tt> is <tt>false</tt>,
-<br/><tab2/> - <tt>is_constructible_v&lt;T, const optional&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>,
 <br/><tab2/> - <tt>is_constructible_v&lt;T, const basic_optional&lt;U, Allocator&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>,
 <br/><tab2/> - <tt>is_convertible_v&lt;const U&amp;, T&gt;</tt> is <tt>true</tt>,
-<br/><tab2/> - <tt>is_convertible_v&lt;optional&lt;U&gt;&amp;, T&gt;</tt> is <tt>false</tt>,
 <br/><tab2/> - <tt>is_convertible_v&lt;basic_optional&lt;U, Allocator&gt;&amp;, T&gt;</tt> is <tt>false</tt>,
-<br/><tab2/> - <tt>is_convertible_v&lt;optional&lt;U&gt;&amp;&amp;, T&gt;</tt> is <tt>false</tt>,
 <br/><tab2/> - <tt>is_convertible_v&lt;basic_optional&lt;U, Allocator&gt;&amp;&amp;, T&gt;</tt> is <tt>false</tt>,
-<br/><tab2/> - <tt>is_convertible_v&lt;const optional&lt;U&gt;&amp;, T&gt;</tt> is <tt>false</tt>,
 <br/><tab2/> - <tt>is_convertible_v&lt;const basic_optional&lt;U, Allocator&gt;&amp;, T&gt;</tt> is <tt>false</tt>,
-<br/><tab2/> - <tt>is_convertible_v&lt;const optional&lt;U&gt;&amp;&amp;, T&gt;</tt> is <tt>false</tt>,
 <br/><tab2/> - <tt>is_convertible_v&lt;const basic_optional&lt;U, Allocator&gt;&amp;&amp;, T&gt;</tt> is <tt>false</tt>,
-<br/><tab2/> - <tt>is_assignable_v&lt;T&amp;, optional&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>,
 <br/><tab2/> - <tt>is_assignable_v&lt;T&amp;, basic_optional&lt;U, Allocator&gt;&amp;&gt;</tt> is <tt>false</tt>,
-<br/><tab2/> - <tt>is_assignable_v&lt;T&amp;, optional&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>,
 <br/><tab2/> - <tt>is_assignable_v&lt;T&amp;, basic_optional&lt;U, Allocator&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>,
-<br/><tab2/> - <tt>is_assignable_v&lt;T&amp;, const optional&lt;U&gt;&amp;&gt;</tt> is <tt>false</tt>,
 <br/><tab2/> - <tt>is_assignable_v&lt;T&amp;, const basic_optional&lt;U, Allocator&gt;&amp;&gt;</tt> is <tt>false</tt>,
-<br/><tab2/> - <tt>is_assignable_v&lt;T&amp;, const optional&lt;U&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>, and
 <br/><tab2/> - <tt>is_assignable_v&lt;T&amp;, const basic_optional&lt;U, Allocator&gt;&amp;&amp;&gt;</tt> is <tt>false</tt>
 
 
@@ -1008,8 +902,7 @@ that meets the <i>Cpp17Destructible</i> requirements (Table 30).</ins></blockquo
 <br/><code>basic_optional(const basic_optional&amp; rhs);</code>
 <br/><tab/><i>Effects:</i> If <tt>uses-alloc</tt> is <tt>true</tt>, <tt><i>alloc</i></tt> is initialized from 
 <tt>allocator_traits&lt;Allocator&gt;::select_on_container_copy_construction(rhs.get_allocator())</tt>. 
-If <tt>rhs</tt> contains a value, constructs the contained value with uses-allocator construction ([allocator.uses.construction]) with <i>alloc</i> and 
-the expression <tt>*rhs</tt>.
+If <tt>rhs</tt> contains a value, initializes the contained value the expression <tt>*rhs</tt>..
 <br/><tab/><i>Ensures:</i> <tt>bool(rhs) == bool(*this)</tt>.
 <br/><tab/><i>Throws:</i> Any exception thrown by the selected constructor of <tt>T</tt>.
 <br/><tab/><i>Mandates:</i><tt>is_­copy­_constructible_­v&lt;T&gt;</tt> is true.
@@ -1018,7 +911,7 @@ the expression <tt>*rhs</tt>.
 <br/>
 <br/><code>basic_optional(basic_optional&amp;&amp; rhs) noexcept(<i>see below</i>)</code>
 <br/><tab/><i>Effects:</i> If <tt>uses-alloc</tt> is <tt>true</tt>, <tt><i>alloc</i></tt> is initialized with <tt>rhs.<i>alloc</i></tt>. 
-If <tt>rhs</tt> contains a value, initialized the contained value the expression <tt>std::move(*rhs)</tt>. <tt>bool(rhs)</tt> is unchanged.
+If <tt>rhs</tt> contains a value, initializes the contained value the expression <tt>std::move(*rhs)</tt>. <tt>bool(rhs)</tt> is unchanged.
 <br/><tab/><i>Ensures:</i> <tt>bool(rhs) == bool(*this)</tt>.
 <br/><tab/><i>Throws:</i> Any exception thrown by the selected constructor of <tt>T</tt>.
 <br/><tab/><i>Remarks:</i> The expression inside <tt>noexcept</tt> is equivalent to <tt>is_­nothrow_­move_­constructible_­v&lt;T&gt;</tt>. If type is
