@@ -24,7 +24,7 @@
 <body>
 
 <address align=right>
-Document number: P2047R6
+Document number: P2047R7
 <br/>
 Audience: LEWG
 <br/>
@@ -32,7 +32,7 @@ Audience: LEWG
 <a href="mailto:ville.voutilainen@gmail.com">Ville Voutilainen</a><br/>
 <a href="mailto:dinka.ranns@gmail.com">Nina Dinka Ranns</a><br/>
 <a href="mailto:phalpern@halpernwightsoftware.com">Pablo Halpern</a><br/>
-2023-02-02<br/>
+2024-xx-xx<br/>
 </address>
 <hr/>
 <h1 align=center>An allocator-aware optional type</h1>
@@ -67,8 +67,7 @@ Audience: LEWG
   We also propose an <tt>std::pmr::optional</tt> type which is a specialisation 
   of <tt>std::basic_optional</tt> for <tt>std::pmr::polymorphic_allocator&lt;&gt;</tt>.
 </p>
-
-<p>  
+    
   This is a complete proposal with formal wording.
 </p>
 
@@ -103,6 +102,9 @@ do any allocation, and that the name is not appropriate
 <br/>R6:
 <br/> - cleaning up html format
 <br/> - clean up of proposed wording
+<br> R7:
+<br/> - added design considerations for special member functions and swap
+    
 
 
  
@@ -148,7 +150,80 @@ do any allocation, and that the name is not appropriate
 </p>
 
 <h2>Design decisions:</h2>
+    <h3>default constructor      </h3>
+<p>    No conditional triviality of the default constructor - the internal state needs to be initialised. This is the same as in std::optional.
+    uses_allocator construction is always used in case the default allocator construction produces different allocators each time. 
+    Possible optimisation opportunity for allocators which have is_always_equal set to true, but no benefit in triviality or constexpr - uses_allocator construction will be constexpr if it can be constexpr either way. Possible additional consideration is for basic_optional where the value type is not allocator aware - such a basic_variant constexpr considerations would only depend on the constexpr construction of the 0th alternative.
+    We do not propose standardising such optimisations. 
+    
+</p>
+<h3>copy constructor     </h3>
+<p>
+    Copy construction does not do uses_allocator construction - the value type is expected to behave acccording to the traits and get the right allocator. This allows for triviality if allocator is always equal and the constructed type can be trivially copy constructed. If allocator is not always equal, we need to check the traits to get the right allocator and that initialisation can not be trivial. 
+    Possible additional consideration is for basic_optional where the value type is not allocator aware - such a basic_optional does not need to store the allocator and triviality only depends on the triviality of the value type. This proposal does not consider such optimisation. 
 
+</p>
+<h3>move constructor     </h3>
+<p>
+    Move construction does not do uses_allocator construction - the value type is expected to behave acccording to the traits and get the right allocator. This allows for triviality if allocator can be trivially copy constructed and the constructed type can be trivially move constructed. 
+    Possible additional consideration is for basic_optional where the value type is not allocator aware - such a basic_optional does not need to store the allocator and triviality only depends on the triviality of the value type. This proposal does not consider such optimisation. 
+
+</p>
+<h3>value constructor     </h3>
+<p>
+    Value construction must do uses_allocator construction if allocators aren't always equal- the plain copy/move construction may use the wrong allocator.
+    Exception specification : 
+  <br/>       - for non AA type: the exception specification is equivalent to is_nothrow_constructible_v&lt;Tj, T&gt;
+  <br/>       - for AA type: an allocation is potentially throwing. To get a possibly no throw construction, we need to delegate to plain copy/move which can possibly reuse the allocated memory. The delegation can only
+          happen if allocators are always equal. 
+
+</p>
+    
+    <h3>copy assignment constructor     </h3>
+    <p>
+        First the allocator is possibly modified based on the traits, then the assignment/construction is done as normal. 
+        Triviality can only happen if allocator is always equal as any other situation possibly requires a modification in the allocator that can not be checked at compiler time (the resulting allocator in copy construction can not be checked against the POCCA trait)
+        
+        Exception can be thrown by the assignment or the copy construction. The assignment never has to use the possibly modified allocator as the type is expected to follow the allocator traits. The construction doesn't need to use the allocator if allocator is always equal or if the value type is not allocator aware. In all other cases, the copy construction needs to explicitly provide the allocator.
+    </p><p>        
+        With the introduction of allocators, we now have to consider when we can do plain copy construction and when allocator extended construction is needed.
+     <br/>   If type is non AA, we can do plain copy construction. 
+     <br/>   If the type is AA and allocator is always equal, we can also do plain copy construction.  Note that, for allocator is always equal case, plain copy construction and allocator copy construction will efectiveky result in the same allocator. We do not consider the possibility of doing non allocator extended copy construction for the case where the copy assignment allocator propagation matches the resulting allocator at copy construction as that case can't be checked at compile time.
+        In all other cases, copy construction must use allocator extended copy construction to guarantee that the right allocator is used for the value_type.
+    </p>
+    <h3>move assignment constructor </h3>    
+    <p>
+        First the allocator is possibly modified based on the traits, then the assignment/construction is done as normal. 
+   <br/>     In addition to usual triviality requirements, triviality can only happen if the allocator is propagated for move assignment(POCMA=true) or if the allocator is always equal. 
+   <br/>     Possible additional consideration is for basic_optional where the value type is not allocator aware - such a basic_optional does not need to store the allocator and the triviality only depends on the triviality of the value type operations. This proposal does not consider such optimisation. 
+     </p><p>   
+        The exception specification needs to consider assignment and move construction operations. Move assignment can be done without explicilty using the allocator even for AA types. - an AA type is expected to folow the allocator traits. Move construction can be done directly for AA types if the allocator is always equal or if POCMA=true. Otherwise, the move construction needs to explicitly specify the allocator 
+        
+<h3>value assignment constructor</h3>
+<p>
+    Value construction must do uses_allocator construction if allocators aren't always equal- the plain copy/move construction may use the wrong allocator.
+        Exception specification : 
+      <br/>       - for non AA type, the exception specification is equivalent to is_nothrow_assignable_v&lt;Tj, T&gt; &amp; &amp; is_nothrow_constructible_v&lt;Tj, T&gt;
+      <br/>       - for AA type, any allocation is potentially throwing. To get a possibly no throw construction, we need to delegate to plain move which can possibly reuse the allocation. Such delegation can only
+              happen if allocators are always equal. 
+    <br/>
+        Possible additional consideration is for basic_variant where no types are allocator aware - such a basic_variant does not need to ever allocate and exception specification depends only on the alternatives
+        This proposal does not consider such optimisation.
+    </p>
+    
+    <h3>swap</h3>
+<p>
+    First the allocator is possibly modified based on the traits, then the swap/construction is done as normal. 
+    
+    Exception specification : To get a possibly no throw construction, we need to delegate to plain move which can possibly reuse the allocation. The delegation can only happen if allocators are always equal or if 
+    propagate_on_container_swap == true (for such a type, the resulting allocator in move construction is the required allocator as move construction always propagates the allocator.) This means that swap can only be 
+    noexcept if 
+    <br/> -  value type is is_nothrow_move_constructible and is_nothrow_constructible_v, and
+    <br/> -  allocator is always equal or propagate_on_container_swap == true
+    </p>
+
+<p>  
+    
 <p><h3><tt>basic_optional</tt> supports non-scoped propagating allocators </h3></p>
 <p>
   There are two ways of viewing <tt>basic_optional&lt;T&gt;</tt>  from allocator propagation perspective :
@@ -229,7 +304,7 @@ extension because it might inform the implementation design they go for.
 </p>
 
 
-<p><h3> Allocator used in value_or </h3></p>
+<h3> Allocator used in value_or </h3>
 <p>
   It is not all that obvious which allocator should be used for the
   object returned by <tt>value_or</tt>. Should the decision be left to the type
@@ -239,9 +314,8 @@ extension because it might inform the implementation design they go for.
   cares about the allocator of the returned object, it should be explicitly
   provided by the user. We may consider providing allocator extended version
   of <tt>value_or</tt> in the future, if this use case proves to be common enough.
-  
-<h3>Deduction guides for mixed optionals unpack</p>
-</h3>
+</p>
+<h3>Deduction guides for mixed optionals unpack</h3>
 <p>
 Consider
 <tt>
@@ -276,7 +350,7 @@ by the standard to work together in a way a user defined type which inherits fro
 wouldn't be. 
 </p>
 
-<p><h3> Non allocator aware <tt>basic_optional</tt> is not an alias for <tt>optional</tt> </h3></p>
+<h3> Non allocator aware <tt>basic_optional</tt> is not an alias for <tt>optional</tt> </h3>
 <p>
 	An early draft of this proposal suggested using a type alias where a non-AA <tt>basic_optional</tt>
 	aliases <tt>std::optional</tt>, and AA <tt>basic_optional</tt> aliases a new unnamed type. 
@@ -298,11 +372,11 @@ wouldn't be.
 and using the nested <tt>type</tt> of the <tt>std::conditional</tt> as the function template parameter  made for an undeduced context.
 </p>
 
-<p><h3> Free swap has a wide contract </h3></p>
+<h3> Free swap has a wide contract </h3>
 <p>The free swap function has been made to have a wide contract and work with different allocators, as discussed in 
 P0178 (http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2016/p0178r0.html)
 </p>
-<p><h3> Make facilities are not provided </h3></p>
+<h3> Make facilities are not provided </h3>
 <p>
 Make facilities have been deemed unnecessary with the availability of CTAD. The current
 version of the paper doesn't propose <tt>std::make_basic_optional</tt> nor <tt>std::pmr::make_optional</tt>.
@@ -312,7 +386,7 @@ allocator extended version of the make facility. We deem such complexity unneces
 with the advent of the CTAD feature.
 </p>
 
-<p><h3> Allocator aware types are assumed to be move enabled </h3></p>
+<h3> Allocator aware types are assumed to be move enabled </h3>
 <p>
 <tt>basic_optional</tt> uses explicit allocator construction except in cases where
 invoking a direct <tt>value_type</tt> operation allows for move operations to remain 
@@ -339,20 +413,12 @@ to exist.
   
 
 
-</p>
+
 <p><h3> Should assignments use <t>is_­constructible</t> trait ? </h3> </p>
 <p>It's not construct from U we need, it's construct from U using the allocator. Do we need a new trait ?</p>
 
 <p><h3>Do we need an “allocator_aware” concept?</h3></p>
-<p>
-  We might consider an “allocator aware” (AA) concept that requires
-  a <tt>get_allocator()</tt>
-  method that returns something convertible to <tt>std::pmr::polymorphic_allocator&lt;&gt;</tt>.
-  If we used this concept instead of the <tt>std::uses_allocator</tt> trait, the allocator would require
-  zero extra space in most (but not all) cases. (The exception would be a type that stores 
-  its allocator outside of its footprint and whose footprint is smaller than 
-  polymorphic_allocator<>.)
-</p>
+
 
 <h2>Proposed wording</h2>
 <p>
