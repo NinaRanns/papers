@@ -74,7 +74,7 @@ exists at address `dst`, that the lifetime of the object at address `dst` has be
 object at address `src` has ended."
 
 Many operations within the standard library are morally relocations, such as erase, insert (to do: add other examples), yet they are often implemented in terms of assignment. 
-Swap, on the other hand, exchanges values of two existing objects, but can for a certain subset of types be implemented as a series of relocations. It is important to note that swap, inherently, isn't a relocation. We do want to enable swap optimisations when we know that the relocation <!-- MG: I assume you meant "trivial relocation" or "memcpy" rather than relocation here. --> will do "the right thing".
+Swap, on the other hand, exchanges values of two existing objects, but can for a certain subset of types be implemented as a series of trivial relocations. It is important to note that swap, inherently, isn't a relocation. We do want to enable swap optimisations when we know that the trivial relocation will do "the right thing".
 
 To untangle the problem of relocation and swap, we will analyse both separately, 
 
@@ -119,8 +119,9 @@ Two things need to hold for swap to be able to be reduced to relocation
 1) the type needs to be relocatable
 2) the semantic should not change if we use relocation instead of assignment
 
-P1144 recognises the benefits of optimising swap to use relocation where possible, and P3236 provides the library author's request to reason about when swap can be implemented in terms of relocation. 
-<!-- MG: The phrase "request to reason about" has a somewhat vague meaning. -->
+P1144 recognises the benefits of optimising swap to use relocation where possible. P3236 provides a request from library authors to be able to reason about when swap can be implemented in terms of relocation. 
+<!-- MG: The phrase "request to reason about" has a somewhat vague meaning. 
+     Nina: Modified to " P3236 provides a request from library authors to be able to reason about when". Is that better ? -->
 
 We argue that the way forward is to carve out types for which construction+destruction is equivalent to assignment. We refer to these types within this paper as replaceable types. A trait is_replaceable<T> could be provided. One possible specification of such a trait is one which is true for types where no copy constructor, assignment operator, or destructor is virtual or user provided, and false otherwise. A type could also specialise the trait to explicitly say whether the equivalence holds. Note that this paper is not proposing the exact semantics of such trait, we are simply demonstrating what such trait might look like. 
 
