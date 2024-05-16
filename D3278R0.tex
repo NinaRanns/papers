@@ -150,20 +150,27 @@ We recognise that 2 and 3 allow for an easier transition. However, option 1 is t
 
 Note that the question of when to allow a type to be marked as relocatable based on the relocatibility of its subobjects is a separate question to whether relocation takes assignment into account.
 
-\section{attribute vs core feature}
+\section{Attribute vs new syntax}
 
-Backwards compatibility can be achieved by
-
-\begin{colorblock}
-#ifdef __cpp_relocation_macro
-trivially_relocatable
-#endif
-\end{colorblock}
-
-%TODO add other reasons why core feature is better than an attribute.
+\paper{P3236R0} argues that a an attribute would allow enabling the feature in earlier language modes.
+However, EWG reaffirmed many times that attribute should be ignorable and as such not have semantics impact.
+This is part of the \href{https://eel.is/c++draft/dcl.attr#grammar-note-5}{C++ specification}.
+Trivial relocation is both a contractual property of a type, and something that can be observed through traits.
 
 
-Note that the question of whether we should have an attribute or a core language feature to mark a type as relocatable is a separate question to whether we should take assignment into account for relocation, and a separate question to whether we should allow marking a type relocatable if any of its subobjects are not relocatable.
+\tcode{no_unique_address} and the subsequent decision by some implementations not to adopt it caused significant pains
+in the ecosystem, and we should try not to repeat the same mistakes.
+Some implementers (notably Clang's) expressed their opposition to an attribute syntax for trivial relocation.
+Following both EWG's and Implementers guidance, \paper{P2786R5} choose not to bring the question of attribute ignorability again,
+preferring introducing a new contextual keyword.
+
+We should note however that implementers can (and likely will) backport this feature in older language modes
+(in part so that standard libraries can support relocation unconditionally).
+
+Note that all implementations warn on unknown attributes such that using an attribute would not permit using
+trivial relocation with older toolchain without the use of a macro.
+
+%Finally, the question of whether we should have an attribute or a core language feature to mark a type as relocatable is a separate question to whether we should take assignment into account for relocation, and a separate question to whether we should allow marking a type relocatable if any of its subobjects are not relocatable.
 
 \section{conclusion}
 
