@@ -53,7 +53,7 @@
 
 \begin{abstract}
 \noindent
-In this paper we analyse the relationship between relocation and swap.
+In this paper we analyse the relationship between relocation, assignmemt, and swap.
 Additionally, we address the points raised in P3236 %(todo: insert link).
 \end{abstract}
 
@@ -76,10 +76,9 @@ From P2786
 exists at address `dst`, that the lifetime of the object at address `dst` has begun, and that the lifetime of the
 object at address `src` has ended."
 
-Many operations within the standard library are morally relocations, such as erase, insert (to do: add other examples), yet they are often implemented in terms of assignment.
-Swap, on the other hand, exchanges values of two existing objects, but can for a certain subset of types be implemented as a series of trivial relocations. It is important to note that swap, inherently, isn't a relocation. We do want to enable swap optimisations when we know that the trivial relocation will do "the right thing".
+Many operations within the standard library are morally relocations, such as vector::erase and vector::insert, yet they are often implemented in terms of assignment. However, we argue assignment and relocation are two different notions.
 
-To untangle the problem of relocation and swap, we will analyse both separately,
+Swap exchanges values of two existing objects, but can for a certain subset of types be implemented as a series of trivial relocations. It is important to note that swap, inherently, isn't a relocation. We do want to enable swap optimisations when we know that the trivial relocation will do "the right thing".
 
 \section{Relocation and Trivial relocation}
 
@@ -91,25 +90,12 @@ In practice, most standard library implementations use assignment when moving va
 \href{https://eel.is/c++draft/sequences#deque.modifiers-6}{the specification of deque}
 "Complexity: The number of calls to the destructor of T is the same as the number of elements erased, but the number of calls to the assignment operator of T is no more than the lesser of the number of elements before the erased elements and the number of elements after the erased elements"
 
+However, it is important to note that relocation exchanges objects and assignment exchanges values of objects. The distinction matters in cases where the identity of the object and its value are not the same thing. We can imagine an object that holds some trivially relocatable ID and a value. On assignment, the value is exchanged without affecting the ID. However, relocation should result in an object with the same ID. A type holding such an ID can reasonably not need a user defined copy constructor or destructor, but will need a user defined assignment operator in order to only assign the parts of the object that make up the value. (We talk about ID's, but we see similar semantics in tuple<int&>). We argue that this category of types should not prevent library implementors from taking advantage of trivial relocation within the operations that are morally relocations : relocating operations that use assignment currently have an unclear semantic for these types, and it is questionable whether the new semantic would be wrong. We do not propose adding additional specifications to the library, we want to leave the choice on how and when these operations are optimised to the library authors.
 
-For a lot of types, the distinction between assignment to an existing object and construction of a new object into a space occupied by an existing object is non-existent, and the implementation which uses an assignment to achieve the relocation of objects can't be distinguished from one that does construction.
-Overall, `vector` is written as if all types behave consistently when replacement is swapped with assignment, and that is clearly not the case for a number of types that have otherwise reasonable semantics.
 
-We observe two cases of types where assignment and construction (possibly) yield a different result.
+While we want to allow existing implementations to optimise cases of relocations that are currenly implemented in terms of assignment, we do want to seperate the notions of assignment from the notion of relocation. Adding the notion of relocation to the standard is not just about managing existing cases of relocation, and we should not be limiting the meaning of relocation according to the implementations that were dones before the notion of relocation existed. We do not want to pessimise future implementations which are specified in terms of relocation because we have not distinguished between construction and assignment semantics so far.
 
-1) types for which relocation operations implemented in terms of assignment yields the wrong result
-
-For example, `pmr::string` propagates the allocator on move construction, but does not propagate the allocator on move assignment. If relocation operations use assignment, the resulting allocator may not be the correct one.
-
-2) types for which it isn't clear what the desired semantic is
-
-\tcode{tuple<int\&>} binds the reference on construction, but assigns through the reference in assignment. It is generally unclear what should happen for the objects of type \tcode{tuple<int\&>} relocated during something like \tcode{vector::erase}.
-
-We argue that neither category of types outlined above prevents library implementors from taking advantage of trivial relocation within the operations that are morally relocations : it will give the correct behaviour for former types, while latter types already have an unclear semantic, and it is questionable whether the new semantic would be wrong. We do not propose adding additional specifications to the library, we want to leave the choice on how and when these operations are optimised to the library authors.
-
-We also argue that we do not want to pessimise future implementations which are specified in terms of relocation because we have not distinguished between construction and assignment semantics so far.
-
-Note that the implementors do have a choice to preserve the behaviour of existing methods for the types outlined above in the same way they might do for swap.
+Taking an approach where we reason about trivial relocation without taking assignment into consideration, while also having a way of distinguishing types for which assignment has different semantics to copy construction allows the implementors do have a choice of preserve the behaviour of existing methods for the types outlined above in the same way they might do for swap.
 
 \section{swap}
 
@@ -123,13 +109,10 @@ Two things need to hold for swap to be able to be reduced to relocation
 2) the semantic should not change if we use relocation instead of assignment
 
 P1144 recognises the benefits of optimising swap to use relocation where possible. P3236 provides a request from library authors to be able to reason about when swap can be implemented in terms of relocation.
-<!-- MG: The phrase "request to reason about" has a somewhat vague meaning.
-     Nina: Modified to " P3236 provides a request from library authors to be able to reason about when". Is that better ? -->
 
 We argue that the way forward is to carve out types for which construction+destruction is equivalent to assignment. We refer to these types within this paper as replaceable types. A trait is_replaceable<T> could be provided. One possible specification of such a trait is one which is true for types where no copy constructor, assignment operator, or destructor is virtual or user provided, and false otherwise. A type could also specialise the trait to explicitly say whether the equivalence holds. Note that this paper is not proposing the exact semantics of such trait, we are simply demonstrating what such trait might look like.
 
-
-Implementing swap would then be a case of writing a specialisation for types for which both is_trivially_relocatable and is_replaceable holds. Note that is_replaceable could also be used in other situations where one needs to understand whether assignment has different semantics to copy construction.
+Implementing swap would then be a case of writing a specialisation for types for which both is_trivially_relocatable and is_replaceable holds. Note that is_replaceable could also be used in other situations where one needs to understand whether assignment has different semantics to copy construction, like deciding when to optimise relocation operations that are currently implemented using assignment. 
 
 This solves the problem of \tcode{tuple<int>} vs \tcode{tuple<int\&>} problem raised by P3236.
 
